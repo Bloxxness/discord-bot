@@ -8,7 +8,7 @@ keep_alive()
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
-FANS_ROLE_NAME = "[ᓘ] Fans"
+FANS_ROLE_NAME = "[𖣘] Fans"
 
 # Intents setup
 intents = discord.Intents.default()
