@@ -48,4 +48,28 @@ async def on_ready():
 @bot.event
 async def on_member_update(before, after):
     before_roles = [role.name for role in before.roles]
-    after_roles = [role.name_
+    after_roles = [role.name for role in after.roles]
+
+    guild = after.guild
+    verified_role = discord.utils.get(guild.roles, name=VERIFIED_ROLE_NAME)
+    unverified_role = discord.utils.get(guild.roles, name=UNVERIFIED_ROLE_NAME)
+    fans_role = discord.utils.get(guild.roles, name=FANS_ROLE_NAME)
+
+    # If Verified was added
+    if VERIFIED_ROLE_NAME not in before_roles and VERIFIED_ROLE_NAME in after_roles:
+        if fans_role and fans_role not in after.roles:
+            await after.add_roles(fans_role)
+            print(f"🌟 Added '{FANS_ROLE_NAME}' to {after.display_name}")
+
+        if unverified_role and unverified_role in after.roles:
+            await after.remove_roles(unverified_role)
+            print(f"❌ Removed '{UNVERIFIED_ROLE_NAME}' from {after.display_name}")
+
+    # If Verified was removed
+    if VERIFIED_ROLE_NAME in before_roles and VERIFIED_ROLE_NAME not in after_roles:
+        if fans_role and fans_role in after.roles:
+            await after.remove_roles(fans_role)
+            print(f"🚫 Removed '{FANS_ROLE_NAME}' from {after.display_name}")
+
+# Start the bot
+bot.run(os.getenv("TOKEN"))
