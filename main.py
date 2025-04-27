@@ -70,6 +70,34 @@ async def on_member_update(before, after):
         if fans_role and fans_role in after.roles:
             await after.remove_roles(fans_role)
             print(f"🚫 Removed '{FANS_ROLE_NAME}' from {after.display_name}")
+from discord import app_commands
+
+# Make sure your bot has 'application_commands' scope enabled
+tree = app_commands.CommandTree(bot)
+
+@bot.event
+async def on_ready():
+    await tree.sync()
+    print(f"✅ Bot is online as {bot.user}")
+
+@tree.command(name="giverole", description="Give a role to yourself or another member.")
+@app_commands.describe(role="The role you want to give", member="The member to give the role to (optional)")
+async def giverole(interaction: discord.Interaction, role: discord.Role, member: discord.Member = None):
+    # Only allow the user 'bloxxnes' to use this command
+    if interaction.user.name.lower() != "bloxxnes":
+        await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
+        return
+
+    if member is None:
+        member = interaction.user  # Default to the command user if no member is specified
+
+    try:
+        await member.add_roles(role)
+        await interaction.response.send_message(f"✅ Gave {role.mention} to {member.mention}!")
+    except discord.Forbidden:
+        await interaction.response.send_message("⚠️ I don't have permission to assign that role.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
 # Start the bot
 bot.run(os.getenv("TOKEN"))
