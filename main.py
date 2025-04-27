@@ -72,7 +72,7 @@ async def on_member_update(before, after):
             print(f"🚫 Removed '{FANS_ROLE_NAME}' from {after.display_name}")
 from discord import app_commands
 
-# Make sure your bot has 'application_commands' scope enabled
+# Slash command setup
 tree = app_commands.CommandTree(bot)
 
 @bot.event
@@ -80,16 +80,13 @@ async def on_ready():
     await tree.sync()
     print(f"✅ Bot is online as {bot.user}")
 
-@tree.command(name="giverole", description="Give a role to yourself or another member.")
-@app_commands.describe(role="The role you want to give", member="The member to give the role to (optional)")
-async def giverole(interaction: discord.Interaction, role: discord.Role, member: discord.Member = None):
+@tree.command(name="giverole", description="Give a role to a user.")
+@app_commands.describe(member="The user you want to give the role to", role="The role you want to give")
+async def giverole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     # Only allow the user 'bloxxnes' to use this command
     if interaction.user.name.lower() != "bloxxnes":
         await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
         return
-
-    if member is None:
-        member = interaction.user  # Default to the command user if no member is specified
 
     try:
         await member.add_roles(role)
