@@ -81,16 +81,21 @@ async def on_ready():
     print(f"✅ Bot is online as {bot.user}")
 
 @tree.command(name="giverole", description="Give a role to a user.")
-@app_commands.describe(member="The user you want to give the role to", role="The role you want to give")
-async def giverole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
+@app_commands.describe(member="The user you want to give the role to", role_name="The name of the role you want to give")
+async def giverole(interaction: discord.Interaction, member: discord.Member, role_name: str):
     # Only allow the user 'bloxxnes' to use this command
     if interaction.user.name.lower() != "bloxxnes":
         await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
         return
 
+    role = discord.utils.get(interaction.guild.roles, name=role_name)
+    if not role:
+        await interaction.response.send_message(f"⚠️ Role '{role_name}' not found.", ephemeral=True)
+        return
+
     try:
         await member.add_roles(role)
-        await interaction.response.send_message(f"✅ Gave {role.mention} to {member.mention}!")
+        await interaction.response.send_message(f"✅ Gave '{role.name}' to {member.mention}!")
     except discord.Forbidden:
         await interaction.response.send_message("⚠️ I don't have permission to assign that role.", ephemeral=True)
     except Exception as e:
