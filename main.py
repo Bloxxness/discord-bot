@@ -6,7 +6,7 @@ import os
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
-FANS_ROLE_NAME = "[𖣘] Fans"
+FANS_ROLE_NAME = "[ᓘ] Fans"
 
 # Intents setup
 intents = discord.Intents.default()
@@ -15,11 +15,10 @@ intents.guilds = True
 
 # Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
-tree = app_commands.CommandTree(bot)
 
 @bot.event
 async def on_ready():
-    await tree.sync()
+    await bot.tree.sync()
     print(f"✅ Bot is online as {bot.user}")
 
     for guild in bot.guilds:
@@ -69,7 +68,7 @@ async def on_member_update(before, after):
             await after.remove_roles(fans_role)
             print(f"🚫 Removed '{FANS_ROLE_NAME}' from {after.display_name}")
 
-@tree.command(name="giverole", description="Give a role to a user.")
+@bot.tree.command(name="giverole", description="Give a role to a user.")
 @app_commands.describe(member="The user you want to give the role to", role_name="The name of the role you want to give")
 async def giverole(interaction: discord.Interaction, member: discord.Member, role_name: str):
     # Only allow the user 'bloxxnes' to use this command
