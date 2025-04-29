@@ -1,9 +1,9 @@
-print("TOKEN:", os.getenv("TOKEN"))
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 import os
+print("TOKEN:", os.getenv("TOKEN"))
 # Hi Galacto
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
