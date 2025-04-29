@@ -1,14 +1,12 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import os
-from keep_alive import keep_alive
-
-keep_alive()
 
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
-FANS_ROLE_NAME = "[𖣘] Fans"
+FANS_ROLE_NAME = "[ᓘ] Fans"
 
 # Intents setup
 intents = discord.Intents.default()
@@ -17,9 +15,11 @@ intents.guilds = True
 
 # Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
+tree = app_commands.CommandTree(bot)
 
 @bot.event
 async def on_ready():
+    await tree.sync()
     print(f"✅ Bot is online as {bot.user}")
 
     for guild in bot.guilds:
@@ -33,17 +33,15 @@ async def on_ready():
             continue
 
         for member in guild.members:
-            # If member has Verified role
-            if verified_role in member.roles:
-                # If they have Unverified, remove it
-                if unverified_role in member.roles:
-                    await member.remove_roles(unverified_role)
-                    print(f"🧙‍♂️ Removed '{UNVERIFIED_ROLE_NAME}' from {member.display_name}")
+            # Remove Unverified if already Verified
+            if verified_role in member.roles and unverified_role in member.roles:
+                await member.remove_roles(unverified_role)
+                print(f"🧙‍♂️ Removed '{UNVERIFIED_ROLE_NAME}' from {member.display_name}")
 
-                # If they don't have Fans, add it
-                if fans_role not in member.roles:
-                    await member.add_roles(fans_role)
-                    print(f"🌟 Added '{FANS_ROLE_NAME}' to {member.display_name}")
+            # Add Fans if Verified but doesn't have Fans yet
+            if verified_role in member.roles and fans_role not in member.roles:
+                await member.add_roles(fans_role)
+                print(f"🌟 Added '{FANS_ROLE_NAME}' to {member.display_name}")
 
 @bot.event
 async def on_member_update(before, after):
@@ -55,7 +53,7 @@ async def on_member_update(before, after):
     unverified_role = discord.utils.get(guild.roles, name=UNVERIFIED_ROLE_NAME)
     fans_role = discord.utils.get(guild.roles, name=FANS_ROLE_NAME)
 
-    # If Verified was added
+    # If Verified added
     if VERIFIED_ROLE_NAME not in before_roles and VERIFIED_ROLE_NAME in after_roles:
         if fans_role and fans_role not in after.roles:
             await after.add_roles(fans_role)
@@ -65,20 +63,11 @@ async def on_member_update(before, after):
             await after.remove_roles(unverified_role)
             print(f"❌ Removed '{UNVERIFIED_ROLE_NAME}' from {after.display_name}")
 
-    # If Verified was removed
+    # If Verified removed
     if VERIFIED_ROLE_NAME in before_roles and VERIFIED_ROLE_NAME not in after_roles:
         if fans_role and fans_role in after.roles:
             await after.remove_roles(fans_role)
             print(f"🚫 Removed '{FANS_ROLE_NAME}' from {after.display_name}")
-from discord import app_commands
-
-# Slash command setup
-tree = app_commands.CommandTree(bot)
-
-@bot.event
-async def on_ready():
-    await tree.sync()
-    print(f"✅ Bot is online as {bot.user}")
 
 @tree.command(name="giverole", description="Give a role to a user.")
 @app_commands.describe(member="The user you want to give the role to", role_name="The name of the role you want to give")
