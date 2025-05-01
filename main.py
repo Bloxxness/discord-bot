@@ -1,4 +1,3 @@
-
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -9,6 +8,10 @@ print("TOKEN:", os.getenv("TOKEN"))
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
 FANS_ROLE_NAME = "[𖣘] Fans"
+# Keep Alive stuff
+from keep_alive import keep_alive
+
+keep_alive()
 
 # Intents setup
 intents = discord.Intents.default()
