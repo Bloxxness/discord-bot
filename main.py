@@ -73,23 +73,33 @@ async def on_member_update(before, after):
             print(f"🚫 Removed '{FANS_ROLE_NAME}' from {after.display_name}")
 
 @bot.tree.command(name="giverole", description="Give a role to a user.")
-@app_commands.describe(member="The user you want to give the role to", role_name="The name of the role you want to give")
+@app_commands.describe(member="The user you want to give the role to", role_name="The name or mention of the role you want to give")
 async def giverole(interaction: discord.Interaction, member: discord.Member, role_name: str):
+    await interaction.response.defer(ephemeral=True)  # ⏳ Prevents "app didn't respond"
+
     if interaction.user.name.lower() != "bloxxnes":
-        await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
+        await interaction.followup.send("🚫 You don't have permission to use this command.", ephemeral=True)
         return
 
-    # Debug: print all roles
-    role_names = [role.name for role in interaction.guild.roles]
-    print("Available roles:", role_names)
+    # Try to extract role
+    role = None
+    if role_name.startswith("<@&") and role_name.endswith(">"):
+        role_id = int(role_name[3:-1])
+        role = interaction.guild.get_role(role_id)
+    else:
+        role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), interaction.guild.roles)
 
-    role = discord.utils.get(interaction.guild.roles, name=role_name)
     if not role:
-        await interaction.response.send_message(
-            f"⚠️ Role '{role_name}' not found.\nAvailable roles: {', '.join(role_names)}",
-            ephemeral=True
-        )
+        await interaction.followup.send(f"⚠️ Role '{role_name}' not found.", ephemeral=True)
         return
+
+    try:
+        await member.add_roles(role)
+        await interaction.followup.send(f"✅ Gave '{role.name}' to {member.mention}!", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send("⚠️ I don't have permission to assign that role.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
 
 # Start the bot
 bot.run(os.getenv("TOKEN"))
