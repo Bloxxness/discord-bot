@@ -76,23 +76,21 @@ async def on_member_update(before, after):
 @bot.tree.command(name="giverole", description="Give a role to a user.")
 @app_commands.describe(member="The user you want to give the role to", role_name="The name of the role you want to give")
 async def giverole(interaction: discord.Interaction, member: discord.Member, role_name: str):
-    # Only allow the user 'bloxxnes' to use this command
     if interaction.user.name.lower() != "bloxxnes":
         await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
         return
 
+    # Debug: print all roles
+    role_names = [role.name for role in interaction.guild.roles]
+    print("Available roles:", role_names)
+
     role = discord.utils.get(interaction.guild.roles, name=role_name)
     if not role:
-        await interaction.response.send_message(f"⚠️ Role '{role_name}' not found.", ephemeral=True)
+        await interaction.response.send_message(
+            f"⚠️ Role '{role_name}' not found.\nAvailable roles: {', '.join(role_names)}",
+            ephemeral=True
+        )
         return
-
-    try:
-        await member.add_roles(role)
-        await interaction.response.send_message(f"✅ Gave '{role.name}' to {member.mention}!")
-    except discord.Forbidden:
-        await interaction.response.send_message("⚠️ I don't have permission to assign that role.", ephemeral=True)
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
 # Start the bot
 bot.run(os.getenv("TOKEN"))
