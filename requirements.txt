@@ -1,3 +1,2 @@
 discord.py
 flask
-pip install flask requests flask-session
