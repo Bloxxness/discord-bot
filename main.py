@@ -77,9 +77,16 @@ async def on_member_update(before, after):
 async def giverole(interaction: discord.Interaction, member: discord.Member, role_name: str):
     await interaction.response.defer(ephemeral=True)  # ⏳ Prevents "app didn't respond"
 
-    if interaction.user.name.lower() != "bloxxnes":
-        await interaction.followup.send("🚫 You don't have permission to use this command.", ephemeral=True)
-        return
+# List of allowed user IDs
+ALLOWED_USER_IDS = [
+    1045850558499655770,  # Replace with your actual Discord ID
+    1236750566408061060,  # Add more user IDs here if needed
+]
+
+# Inside your command
+if interaction.user.id not in ALLOWED_USER_IDS:
+    await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
+    return
 
     # Try to extract role
     role = None
