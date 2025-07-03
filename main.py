@@ -46,8 +46,8 @@ file_path = "memory.json"
 def load_memory():
     """Load memory from GitHub file."""
     try:
-        file_content = repo.get_contents(file_path)
-        memory_data = json.loads(file_content.decoded_content.decode())
+        file_content = repo.get_contents(file_path)  # Fetches the file from GitHub
+        memory_data = json.loads(file_content.decoded_content.decode())  # Decodes the file content into a Python dict
         return memory_data
     except Exception as e:
         print(f"Error loading memory from GitHub: {e}")
@@ -57,7 +57,7 @@ def load_memory():
 def save_memory(memory_data):
     """Save memory back to GitHub."""
     try:
-        file_content = json.dumps(memory_data, indent=4)
+        file_content = json.dumps(memory_data, indent=4)  # Converts memory data back into JSON format
         repo.update_file(file_path, "Update memory.json", file_content, repo.get_contents(file_path).sha)
     except Exception as e:
         print(f"Error saving memory to GitHub: {e}")
@@ -77,6 +77,16 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Store active conversations per user id
 active_conversations = {}
+
+def generate_user_summary(user_id):
+    """Generate a summary of previous conversations for the user."""
+    user_memory = memory_data.get(str(user_id), [])
+    summary = ""
+    
+    for entry in user_memory:
+        summary += f"User {entry['username']} said: {entry['summary']}\n"
+
+    return summary
 
 @bot.event
 async def on_ready():
@@ -164,9 +174,12 @@ async def ask(interaction: discord.Interaction):
         await interaction.response.send_message("You already have an active chat session! Just send me messages here.", ephemeral=True)
         return
 
+    # Generate the user summary from previous conversations
+    user_summary = generate_user_summary(user_id)
+
     # Initialize conversation history for user
     active_conversations[user_id] = [
-        {"role": "system", "content": AI_SYSTEM_PROMPT},
+        {"role": "system", "content": AI_SYSTEM_PROMPT + f"\nPrevious interactions:\n{user_summary}"},
         {"role": "assistant", "content": "Hi! I'm GalacBot the local server helper! How may I be of assistance?"}
     ]
 
@@ -208,8 +221,17 @@ async def on_message(message):
                 answer = response.choices[0].message.content.strip()
                 conversation.append({"role": "assistant", "content": answer})
                 
-                # Save conversation to GitHub memory
-                memory_data[user_id] = memory_data.get(user_id, []) + [{"role": "user", "content": message.content}, {"role": "assistant", "content": answer}]
+                # Create summary of this interaction
+                user_summary = {
+                    "username": message.author.name,
+                    "summary": answer  # AI generated summary for now
+                }
+
+                # Save updated memory
+                if str(user_id) not in memory_data:
+                    memory_data[str(user_id)] = []
+
+                memory_data[str(user_id)].append(user_summary)
                 save_memory(memory_data)
 
                 await message.channel.send(f"{answer}")  # Removed "GalacBot:" prefix
@@ -222,3 +244,4 @@ async def on_message(message):
         await bot.process_commands(message)
 
 bot.run(token)
+
