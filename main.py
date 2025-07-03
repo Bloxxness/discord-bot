@@ -2,14 +2,14 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
-# Hi Galacto
+
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
 FANS_ROLE_NAME = "[𖣘] Fans"
-# Keep Alive stuff
-from keep_alive import keep_alive
 
+# Keep Alive
+from keep_alive import keep_alive
 keep_alive()
 
 # Intents setup
@@ -20,11 +20,16 @@ intents.guilds = True
 # Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Allowed users for special commands
+ALLOWED_USER_IDS = [
+    1045850558499655770,  # You
+    1236750566408061060   # Add others here
+]
+
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print(f"✅ Bot is online as {bot.user}")
-
     for guild in bot.guilds:
         print(f"🔍 Checking members in guild: {guild.name}")
         verified_role = discord.utils.get(guild.roles, name=VERIFIED_ROLE_NAME)
@@ -36,12 +41,10 @@ async def on_ready():
             continue
 
         for member in guild.members:
-            # Remove Unverified if already Verified
             if verified_role in member.roles and unverified_role in member.roles:
                 await member.remove_roles(unverified_role)
                 print(f"🧙‍♂️ Removed '{UNVERIFIED_ROLE_NAME}' from {member.display_name}")
 
-            # Add Fans if Verified but doesn't have Fans yet
             if verified_role in member.roles and fans_role not in member.roles:
                 await member.add_roles(fans_role)
                 print(f"🌟 Added '{FANS_ROLE_NAME}' to {member.display_name}")
@@ -56,17 +59,14 @@ async def on_member_update(before, after):
     unverified_role = discord.utils.get(guild.roles, name=UNVERIFIED_ROLE_NAME)
     fans_role = discord.utils.get(guild.roles, name=FANS_ROLE_NAME)
 
-    # If Verified added
     if VERIFIED_ROLE_NAME not in before_roles and VERIFIED_ROLE_NAME in after_roles:
         if fans_role and fans_role not in after.roles:
             await after.add_roles(fans_role)
             print(f"🌟 Added '{FANS_ROLE_NAME}' to {after.display_name}")
-
         if unverified_role and unverified_role in after.roles:
             await after.remove_roles(unverified_role)
             print(f"❌ Removed '{UNVERIFIED_ROLE_NAME}' from {after.display_name}")
 
-    # If Verified removed
     if VERIFIED_ROLE_NAME in before_roles and VERIFIED_ROLE_NAME not in after_roles:
         if fans_role and fans_role in after.roles:
             await after.remove_roles(fans_role)
@@ -75,24 +75,19 @@ async def on_member_update(before, after):
 @bot.tree.command(name="giverole", description="Give a role to a user.")
 @app_commands.describe(member="The user you want to give the role to", role_name="The name or mention of the role you want to give")
 async def giverole(interaction: discord.Interaction, member: discord.Member, role_name: str):
-    await interaction.response.defer(ephemeral=True)  # ⏳ Prevents "app didn't respond"
+    await interaction.response.defer(ephemeral=True)
 
-# List of allowed user IDs
-ALLOWED_USER_IDS = [
-    1045850558499655770,  # Replace with your actual Discord ID
-    1236750566408061060,  # Add more user IDs here if needed
-]
+    if interaction.user.id not in ALLOWED_USER_IDS:
+        await interaction.followup.send("🚫 You don't have permission to use this command.", ephemeral=True)
+        return
 
-# Inside your command
-if interaction.user.id not in ALLOWED_USER_IDS:
-    await interaction.response.send_message("🚫 You don't have permission to use this command.", ephemeral=True)
-    return
-
-    # Try to extract role
     role = None
     if role_name.startswith("<@&") and role_name.endswith(">"):
-        role_id = int(role_name[3:-1])
-        role = interaction.guild.get_role(role_id)
+        try:
+            role_id = int(role_name[3:-1])
+            role = interaction.guild.get_role(role_id)
+        except:
+            pass
     else:
         role = discord.utils.find(lambda r: r.name.lower() == role_name.lower(), interaction.guild.roles)
 
