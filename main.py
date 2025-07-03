@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
-import openai
+from openai import OpenAI
 from keep_alive import keep_alive
 
 # Role names
@@ -11,7 +11,6 @@ UNVERIFIED_ROLE_NAME = "[❌] Unverified"
 FANS_ROLE_NAME = "[𖣘] Fans"
 
 # AI Personality Prompt
-# You can change the bot's personality by editing this string:
 AI_SYSTEM_PROMPT = (
     "You are GalacBot, a happy and joyful Discord bot who helps with server tasks and loves chatting naturally and helpfully."
 )
@@ -19,8 +18,9 @@ AI_SYSTEM_PROMPT = (
 # Privileged role ID for server control
 PRIVILEGED_ROLE_ID = 1361802790615253142
 
-# OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Initialize OpenAI client
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI()  # Will use env OPENAI_API_KEY automatically
 
 keep_alive()
 
@@ -156,7 +156,7 @@ async def on_message(message):
             conversation.append({"role": "user", "content": message.content})
 
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=conversation,
                     temperature=0.7
