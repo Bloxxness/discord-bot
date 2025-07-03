@@ -159,6 +159,15 @@ async def ask(interaction: discord.Interaction):
         ]
         await interaction.response.send_message("Hi! I'm GalacBot the local server helper! How may I be of assistance? Please just message me here to chat!", ephemeral=False)
 
+@bot.tree.command(name="endchat", description="End your chat session with GalacBot.")
+async def endchat(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    if user_id in active_conversations:
+        active_conversations.pop(user_id)
+        await interaction.response.send_message("🛑 Your chat session has been ended. Thanks for chatting!", ephemeral=True)
+    else:
+        await interaction.response.send_message("You don't have an active chat session to end.", ephemeral=True)
+
 @bot.event
 async def on_message(message):
     if message.author.bot:
