@@ -2,13 +2,14 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
+import re
 from keep_alive import keep_alive
 
 # Hi Galacto
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
-FANS_ROLE_NAME = "[�] Fans"
+FANS_ROLE_NAME = "[𖣘] Fans"
 
 # Keep Alive
 keep_alive()
@@ -17,7 +18,7 @@ keep_alive()
 intents = discord.Intents.default()
 intents.members = True
 intents.guilds = True
-intents.message_content = True  # Required for on_message
+intents.message_content = True  # Needed for on_message
 
 # Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -108,31 +109,25 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    trigger_phrases = ["tv women is hot", "tv woman is hot", "tv women hot", "tv girl hot"]
-    content_lower = message.content.lower()
-
-    if any(phrase in content_lower for phrase in trigger_phrases):
+    pattern = r'\btv\s+(woman|women)\s*(is|are|r)?\s*hot\b'
+    if re.search(pattern, message.content, re.IGNORECASE):
         try:
             log_channel = bot.get_channel(1351710526283190373)
-            await message.delete()
-            await message.author.kick(reason="Sent prohibited message: 'tv women is hot'")
-
             embed = discord.Embed(
-                title="🚨 User Kicked for Inappropriate Message",
-                description=f"**Message:** {message.content}",
+                title="🚨 Auto-Kick Triggered",
+                description=f"{message.author.mention} said a banned phrase.",
                 color=discord.Color.red()
             )
             embed.set_thumbnail(url=message.author.display_avatar.url)
             embed.add_field(name="Username", value=message.author.name, inline=True)
             embed.add_field(name="Display Name", value=message.author.display_name, inline=True)
-            embed.add_field(name="User ID", value=str(message.author.id), inline=False)
-            embed.set_footer(text=f"User was kicked from {message.guild.name}")
+            embed.add_field(name="User ID", value=message.author.id, inline=True)
+            embed.add_field(name="Message", value=message.content, inline=False)
 
-            if log_channel:
-                await log_channel.send(embed=embed)
-
+            await log_channel.send(embed=embed)
+            await message.author.kick(reason="Said inappropriate phrase involving 'tv woman/women is hot'")
         except Exception as e:
-            print(f"Error handling message: {e}")
+            print(f"Failed to kick or log: {e}")
 
     await bot.process_commands(message)
 
