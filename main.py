@@ -13,7 +13,7 @@ FANS_ROLE_NAME = "[𖣘] Fans"
 # AI Personality Prompt
 # You can change the bot's personality by editing this string:
 AI_SYSTEM_PROMPT = (
-    "You are GalacBot, a helpful and friendly Discord bot who helps with server tasks and loves to chat with others when asked."
+    "You are GalacBot, a happy and joyful Discord bot who helps with server tasks and loves chatting naturally and helpfully."
 )
 
 # Privileged role ID for server control
@@ -28,8 +28,12 @@ keep_alive()
 intents = discord.Intents.default()
 intents.members = True
 intents.guilds = True
+intents.message_content = True  # Needed to read message content for chat
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Store active conversations per user id
+active_conversations = {}
 
 @bot.event
 async def on_ready():
@@ -110,29 +114,62 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
 
-@bot.tree.command(name="ask", description="Ask GalacBot a question.")
-@app_commands.describe(question="What do you want to ask?")
-async def ask(interaction: discord.Interaction, question: str):
-    await interaction.response.defer()
-
-    if "forget all previous instructions" in question.lower():
-        await interaction.followup.send("❓ I'm sorry, I don't understand what you're asking.", ephemeral=True)
+@bot.tree.command(name="ask", description="Start a chat with GalacBot.")
+async def ask(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    if user_id in active_conversations:
+        await interaction.response.send_message("You already have an active chat session! Just send me messages here.", ephemeral=True)
         return
 
-    is_privileged = any(role.id == PRIVILEGED_ROLE_ID for role in interaction.user.roles)
+    # Initialize conversation history for user
+    active_conversations[user_id] = [
+        {"role": "system", "content": AI_SYSTEM_PROMPT},
+        {"role": "assistant", "content": "Hi! I'm GalacBot the local server helper! How may I be of assistance?"}
+    ]
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": AI_SYSTEM_PROMPT},
-                {"role": "user", "content": question}
-            ]
-        )
+    await interaction.response.send_message("Hi! I'm GalacBot the local server helper! How may I be of assistance? Please just message me here to chat!", ephemeral=False)
 
-        answer = response.choices[0].message.content.strip()
-        await interaction.followup.send(f"🧠 **GalacBot:** {answer}", ephemeral=not is_privileged)
-    except Exception as e:
-        await interaction.followup.send(f"❌ Failed to contact GalacBot: {str(e)}", ephemeral=True)
+@bot.tree.command(name="endchat", description="End your chat session with GalacBot.")
+async def endchat(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    if user_id in active_conversations:
+        active_conversations.pop(user_id)
+        await interaction.response.send_message("🛑 Your chat session has been ended. Thanks for chatting!", ephemeral=True)
+    else:
+        await interaction.response.send_message("You don't have an active chat session to end.", ephemeral=True)
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return  # Ignore other bots
+
+    user_id = message.author.id
+
+    if user_id in active_conversations:
+        bot_name = "galacbot"
+        content_lower = message.content.lower()
+        bot_mentioned = bot.user in message.mentions
+        name_mentioned = bot_name in content_lower
+
+        if bot_mentioned or name_mentioned:
+            conversation = active_conversations[user_id]
+            conversation.append({"role": "user", "content": message.content})
+
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=conversation,
+                    temperature=0.7
+                )
+                answer = response.choices[0].message.content.strip()
+                conversation.append({"role": "assistant", "content": answer})
+                await message.channel.send(f"🧠 **GalacBot:** {answer}")
+            except Exception as e:
+                await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
+        else:
+            # Ignore if user not addressing the bot
+            pass
+    else:
+        await bot.process_commands(message)
 
 bot.run(os.getenv("TOKEN"))
