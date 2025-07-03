@@ -170,7 +170,7 @@ async def on_message(message):
             answer = response.choices[0].message.content.strip()
             conversation.append({"role": "assistant", "content": answer})
 
-            # Check if response has already been sent for the message to avoid duplicates
+            # Check if the message ID has already been responded to
             if message.id not in responded_messages:
                 responded_messages.add(message.id)  # Track the responded message
                 await message.channel.send(f"{answer}")
@@ -180,3 +180,4 @@ async def on_message(message):
         await bot.process_commands(message)
 
 bot.run(token)
+``
