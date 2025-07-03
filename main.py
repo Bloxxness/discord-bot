@@ -94,7 +94,7 @@ def generate_user_summary(user_id):
     summary = ""
     
     for entry in user_memory:
-        summary += f"User {entry['username']} ({entry['display_name']}) said: {entry['summary']}\n"
+        summary += f"User {entry['username']} said: {entry['summary']}\n"
 
     return summary
 
@@ -181,20 +181,25 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
 async def ask(interaction: discord.Interaction):
     user_id = interaction.user.id
     user_display_name = interaction.user.display_name  # Get the display name of the user
+    user_summary = generate_user_summary(user_id)  # This generates the user summary from previous messages
+
+    # Generate the user-specific prompt dynamically
+    dynamic_prompt = AI_SYSTEM_PROMPT.format(
+        user_display_name=user_display_name,
+        user_memory_summary=user_summary
+    )
+
     if user_id in active_conversations:
         await interaction.response.send_message("You already have an active chat session! Just send me messages here.", ephemeral=True)
         return
 
-    # Generate the user summary from previous conversations
-    user_summary = generate_user_summary(user_id)
-
     # Initialize conversation history for user
     active_conversations[user_id] = [
-        {"role": "system", "content": AI_SYSTEM_PROMPT + f"\nUser {user_display_name} has interacted before. Previous interactions:\n{user_summary}"},
-        {"role": "assistant", "content": f"Hi {user_display_name}! I'm GalacBot the local server helper! How may I be of assistance?"}
+        {"role": "system", "content": dynamic_prompt},  # Use the dynamic AI_SYSTEM_PROMPT here
+        {"role": "assistant", "content": "Hi! I'm GalacBot the local server helper! How may I be of assistance?"}
     ]
 
-    await interaction.response.send_message(f"Hi {user_display_name}! I'm GalacBot the local server helper! How may I be of assistance? Please just message me here to chat!", ephemeral=False)
+    await interaction.response.send_message("Hi! I'm GalacBot the local server helper! How may I be of assistance? Please just message me here to chat!", ephemeral=False)
 
 @bot.tree.command(name="endchat", description="End your chat session with GalacBot.")
 async def endchat(interaction: discord.Interaction):
@@ -211,7 +216,6 @@ async def on_message(message):
         return  # Ignore other bots
 
     user_id = message.author.id
-    user_display_name = message.author.display_name  # Get the display name
 
     if user_id in active_conversations:
         if message.content.strip():  # If the message is not empty
@@ -227,12 +231,11 @@ async def on_message(message):
                 )
                 answer = response.choices[0].message.content.strip()
                 conversation.append({"role": "assistant", "content": answer})
-                
+
                 # Create summary of this interaction
                 user_summary = {
                     "username": message.author.name,
-                    "display_name": user_display_name,  # Store the display name as well
-                    "summary": answer  # AI generated summary for now
+                    "summary": answer  # AI-generated summary for now
                 }
 
                 # Save updated memory
@@ -250,6 +253,5 @@ async def on_message(message):
             pass
     else:
         await bot.process_commands(message)
-
 
 bot.run(token)
