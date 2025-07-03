@@ -202,12 +202,7 @@ async def on_message(message):
     user_id = message.author.id
 
     if user_id in active_conversations:
-        bot_name = "galacbot"
-        content_lower = message.content.lower()
-        bot_mentioned = bot.user in message.mentions
-        name_mentioned = bot_name in content_lower
-
-        if bot_mentioned or name_mentioned:
+        if message.content.strip():  # If the message is not empty
             conversation = active_conversations[user_id]
             conversation.append({"role": "user", "content": message.content})
 
@@ -238,9 +233,10 @@ async def on_message(message):
             except Exception as e:
                 await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
         else:
-            # Ignore if user not addressing the bot
+            # Ignore empty messages
             pass
     else:
         await bot.process_commands(message)
+
 
 bot.run(token)
