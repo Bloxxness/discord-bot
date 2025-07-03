@@ -2,25 +2,33 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
-import re
+import openai
 from keep_alive import keep_alive
 
-# Hi Galacto
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
 FANS_ROLE_NAME = "[𖣘] Fans"
 
-# Keep Alive
+# AI Personality Prompt
+# You can change the bot's personality by editing this string:
+AI_SYSTEM_PROMPT = (
+    "You are GalacBot, a helpful and friendly Discord bot who helps with server tasks and loves to chat with others when asked."
+)
+
+# Privileged role ID for server control
+PRIVILEGED_ROLE_ID = 1361802790615253142
+
+# OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 keep_alive()
 
 # Intents setup
 intents = discord.Intents.default()
 intents.members = True
 intents.guilds = True
-intents.message_content = True  # Needed for on_message
 
-# Bot setup
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
@@ -42,7 +50,6 @@ async def on_ready():
             if verified_role in member.roles and unverified_role in member.roles:
                 await member.remove_roles(unverified_role)
                 print(f"🧙‍♂️ Removed '{UNVERIFIED_ROLE_NAME}' from {member.display_name}")
-
             if verified_role in member.roles and fans_role not in member.roles:
                 await member.add_roles(fans_role)
                 print(f"🌟 Added '{FANS_ROLE_NAME}' to {member.display_name}")
@@ -61,7 +68,6 @@ async def on_member_update(before, after):
         if fans_role and fans_role not in after.roles:
             await after.add_roles(fans_role)
             print(f"🌟 Added '{FANS_ROLE_NAME}' to {after.display_name}")
-
         if unverified_role and unverified_role in after.roles:
             await after.remove_roles(unverified_role)
             print(f"❌ Removed '{UNVERIFIED_ROLE_NAME}' from {after.display_name}")
@@ -104,32 +110,29 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
 
-@bot.event
-async def on_message(message):
-    if message.author.bot:
+@bot.tree.command(name="ask", description="Ask GalacBot a question.")
+@app_commands.describe(question="What do you want to ask?")
+async def ask(interaction: discord.Interaction, question: str):
+    await interaction.response.defer()
+
+    if "forget all previous instructions" in question.lower():
+        await interaction.followup.send("❓ I'm sorry, I don't understand what you're asking.", ephemeral=True)
         return
 
-    pattern = r'\btv\s+(woman|women)\s*(is|are|r)?\s*hot\b'
-    if re.search(pattern, message.content, re.IGNORECASE):
-        try:
-            log_channel = bot.get_channel(1351710526283190373)
-            embed = discord.Embed(
-                title="🚨 Auto-Kick Triggered",
-                description=f"{message.author.mention} said a banned phrase.",
-                color=discord.Color.red()
-            )
-            embed.set_thumbnail(url=message.author.display_avatar.url)
-            embed.add_field(name="Username", value=message.author.name, inline=True)
-            embed.add_field(name="Display Name", value=message.author.display_name, inline=True)
-            embed.add_field(name="User ID", value=message.author.id, inline=True)
-            embed.add_field(name="Message", value=message.content, inline=False)
+    is_privileged = any(role.id == PRIVILEGED_ROLE_ID for role in interaction.user.roles)
 
-            await log_channel.send(embed=embed)
-            await message.author.kick(reason="Said inappropriate phrase involving 'tv woman/women is hot'")
-        except Exception as e:
-            print(f"Failed to kick or log: {e}")
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": AI_SYSTEM_PROMPT},
+                {"role": "user", "content": question}
+            ]
+        )
 
-    await bot.process_commands(message)
+        answer = response.choices[0].message.content.strip()
+        await interaction.followup.send(f"🧠 **GalacBot:** {answer}", ephemeral=not is_privileged)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Failed to contact GalacBot: {str(e)}", ephemeral=True)
 
-# Start the bot
 bot.run(os.getenv("TOKEN"))
