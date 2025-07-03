@@ -6,6 +6,7 @@ import json
 from openai import OpenAI
 from github import Github
 from keep_alive import keep_alive
+import sqlite3
 
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
@@ -198,12 +199,6 @@ async def on_message(message):
                 
                 # Save the conversation to the memory_data
                 memory_data[str(user_id)] = answer
-                save_memory_to_github(memory_data)
-
-                # Save to other conversations in the memory
-                other_conversations = memory_data.get("others", [])
-                other_conversations.append({"user": message.author.name, "message": message.content})
-                memory_data["others"] = other_conversations
                 save_memory_to_github(memory_data)
 
             except Exception as e:
