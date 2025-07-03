@@ -27,6 +27,7 @@ token = os.getenv("TOKEN")
 if not token:
     raise RuntimeError("TOKEN environment variable not set!")
 
+# Initialize OpenAI client with new SDK usage
 client = OpenAI(api_key=aiapi)
 
 keep_alive()
@@ -163,6 +164,7 @@ async def on_message(message):
             conversation.append({"role": "user", "content": message.content})
 
             try:
+                # Use new OpenAI SDK syntax
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=conversation,
