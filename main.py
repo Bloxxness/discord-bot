@@ -43,6 +43,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Store active conversations per user id
 active_conversations = {}
 
+# Set to track responded messages (using message ID)
+responded_messages = set()
+
 @bot.event
 async def on_ready():
     await bot.tree.sync()
@@ -168,13 +171,9 @@ async def on_message(message):
             conversation.append({"role": "assistant", "content": answer})
 
             # Check if response has already been sent for the message to avoid duplicates
-            if not message.guild:  # Direct message, no need to worry about multiple channel responses
+            if message.id not in responded_messages:
+                responded_messages.add(message.id)  # Track the responded message
                 await message.channel.send(f"{answer}")
-            else:
-                # If it's a guild channel, check if bot already replied
-                if not hasattr(message, 'is_responded'):
-                    message.is_responded = True  # Flag to mark this message as responded
-                    await message.channel.send(f"{answer}")
         except Exception as e:
             await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
     else:
