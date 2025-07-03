@@ -2,8 +2,11 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
+import json
 from openai import OpenAI
 from keep_alive import keep_alive
+from github import Github
+import requests
 
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
@@ -27,8 +30,40 @@ token = os.getenv("TOKEN")
 if not token:
     raise RuntimeError("TOKEN environment variable not set!")
 
+github_token = os.getenv("GITHUB_TOKEN")
+if not github_token:
+    raise RuntimeError("GITHUB_TOKEN environment variable not set!")
+
 # Initialize OpenAI client with new SDK usage
 client = OpenAI(api_key=aiapi)
+
+# Initialize GitHub client
+g = Github(github_token)
+repo = g.get_repo("Bloxxness/bot-memory")
+file_path = "memory.json"
+
+# Function to load memory from GitHub
+def load_memory():
+    """Load memory from GitHub file."""
+    try:
+        file_content = repo.get_contents(file_path)
+        memory_data = json.loads(file_content.decoded_content.decode())
+        return memory_data
+    except Exception as e:
+        print(f"Error loading memory from GitHub: {e}")
+        return {}
+
+# Function to save memory to GitHub
+def save_memory(memory_data):
+    """Save memory back to GitHub."""
+    try:
+        file_content = json.dumps(memory_data, indent=4)
+        repo.update_file(file_path, "Update memory.json", file_content, repo.get_contents(file_path).sha)
+    except Exception as e:
+        print(f"Error saving memory to GitHub: {e}")
+
+# Load memory at startup
+memory_data = load_memory()
 
 keep_alive()
 
@@ -172,7 +207,12 @@ async def on_message(message):
                 )
                 answer = response.choices[0].message.content.strip()
                 conversation.append({"role": "assistant", "content": answer})
-                await message.channel.send(f"🧠 **GalacBot:** {answer}")
+                
+                # Save conversation to GitHub memory
+                memory_data[user_id] = memory_data.get(user_id, []) + [{"role": "user", "content": message.content}, {"role": "assistant", "content": answer}]
+                save_memory(memory_data)
+
+                await message.channel.send(f"{answer}")  # Removed "GalacBot:" prefix
             except Exception as e:
                 await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
         else:
