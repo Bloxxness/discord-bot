@@ -154,30 +154,29 @@ async def on_message(message):
     user_id = message.author.id
 
     if user_id in active_conversations:
-        bot_name = "galacbot"
-        content_lower = message.content.lower()
-        bot_mentioned = bot.user in message.mentions
-        name_mentioned = bot_name in content_lower
+        conversation = active_conversations[user_id]
+        conversation.append({"role": "user", "content": message.content})
 
-        if bot_mentioned or name_mentioned:
-            conversation = active_conversations[user_id]
-            conversation.append({"role": "user", "content": message.content})
+        try:
+            # Use new OpenAI SDK syntax
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=conversation,
+                temperature=0.7
+            )
+            answer = response.choices[0].message.content.strip()
+            conversation.append({"role": "assistant", "content": answer})
 
-            try:
-                # Use new OpenAI SDK syntax
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=conversation,
-                    temperature=0.7
-                )
-                answer = response.choices[0].message.content.strip()
-                conversation.append({"role": "assistant", "content": answer})
-                await message.channel.send(f"🧠 **GalacBot:** {answer}")
-            except Exception as e:
-                await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
-        else:
-            # Ignore if user not addressing the bot
-            pass
+            # Check if response has already been sent for the message to avoid duplicates
+            if not message.guild:  # Direct message, no need to worry about multiple channel responses
+                await message.channel.send(f"{answer}")
+            else:
+                # If it's a guild channel, check if bot already replied
+                if not hasattr(message, 'is_responded'):
+                    message.is_responded = True  # Flag to mark this message as responded
+                    await message.channel.send(f"{answer}")
+        except Exception as e:
+            await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
     else:
         await bot.process_commands(message)
 
