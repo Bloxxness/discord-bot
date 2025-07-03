@@ -5,6 +5,9 @@ import os
 from openai import OpenAI
 from keep_alive import keep_alive
 
+print("OPENAI_API_KEY =", os.getenv("OPENAI_API_KEY"))
+print("TOKEN =", os.getenv("TOKEN"))
+
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
