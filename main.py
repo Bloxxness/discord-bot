@@ -23,6 +23,10 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
     raise RuntimeError("OPENAI_API_KEY environment variable not set!")
 
+bot_token = os.getenv("TOKEN")
+if not bot_token:
+    raise RuntimeError("TOKEN environment variable not set!")
+
 client = OpenAI(api_key=openai_api_key)
 
 keep_alive()
@@ -175,4 +179,4 @@ async def on_message(message):
     else:
         await bot.process_commands(message)
 
-bot.run(os.getenv("TOKEN"))
+bot.run(bot_token)
