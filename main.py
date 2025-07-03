@@ -18,9 +18,12 @@ AI_SYSTEM_PROMPT = (
 # Privileged role ID for server control
 PRIVILEGED_ROLE_ID = 1361802790615253142
 
-# Initialize OpenAI client
-openai_api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI()  # Will use env OPENAI_API_KEY automatically
+# Initialize OpenAI client explicitly with your env var OPEN_API_KEY
+openai_api_key = os.getenv("OPEN_API_KEY")
+if not openai_api_key:
+    raise RuntimeError("OPEN_API_KEY environment variable not set!")
+
+client = OpenAI(api_key=openai_api_key)
 
 keep_alive()
 
