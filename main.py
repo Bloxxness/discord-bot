@@ -2,11 +2,10 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
-import json
 from openai import OpenAI
-from github import Github
-from keep_alive import keep_alive
 import sqlite3
+import json
+from keep_alive import keep_alive
 
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
@@ -28,15 +27,8 @@ token = os.getenv("TOKEN")
 if not token:
     raise RuntimeError("TOKEN environment variable not set!")
 
-github_token = os.getenv("GITHUB_TOKEN")
-if not github_token:
-    raise RuntimeError("GITHUB_TOKEN environment variable not set!")
-
 # Initialize OpenAI client
 client = OpenAI(api_key=aiapi)
-
-# Initialize GitHub client
-g = Github(github_token)
 
 # Keep the bot alive
 keep_alive()
@@ -49,33 +41,44 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# GitHub repository info
-repo_name = "Bloxxness/bot-memory"  # Your GitHub repository
-file_name = "memory.json"  # The file where memory will be saved
+# SQLite Database Setup
+def init_db():
+    connection = sqlite3.connect("user_memory.db")
+    cursor = connection.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_memory (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            memory TEXT
+        )
+    ''')
+    connection.commit()
+    connection.close()
 
-# Fetch memory from GitHub repository
-def get_memory():
-    try:
-        repo = g.get_repo(repo_name)
-        file_content = repo.get_contents(file_name)
-        memory_data = json.loads(file_content.decoded_content.decode())
-        return memory_data
-    except Exception as e:
-        print(f"Error fetching memory from GitHub: {str(e)}")
-        return {}
+def save_memory(user_id, username, memory):
+    connection = sqlite3.connect("user_memory.db")
+    cursor = connection.cursor()
+    
+    cursor.execute('''
+        INSERT OR REPLACE INTO user_memory (user_id, username, memory)
+        VALUES (?, ?, ?)
+    ''', (user_id, username, memory))
+    
+    connection.commit()
+    connection.close()
 
-# Save memory to GitHub repository
-def save_memory_to_github(memory_data):
-    try:
-        repo = g.get_repo(repo_name)
-        file_content = repo.get_contents(file_name)
-        repo.update_file(file_content.path, "Update bot memory", json.dumps(memory_data), file_content.sha)
-        print("Memory saved to GitHub successfully.")
-    except Exception as e:
-        print(f"Error saving memory to GitHub: {str(e)}")
-
-# Initialize memory on startup
-memory_data = get_memory()
+def get_memory(user_id):
+    connection = sqlite3.connect("user_memory.db")
+    cursor = connection.cursor()
+    
+    cursor.execute('''
+        SELECT memory FROM user_memory WHERE user_id = ?
+    ''', (user_id,))
+    
+    memory = cursor.fetchone()
+    connection.close()
+    
+    return memory[0] if memory else None
 
 # Store active conversations per user id
 active_conversations = {}
@@ -102,6 +105,29 @@ async def on_ready():
             if verified_role in member.roles and fans_role not in member.roles:
                 await member.add_roles(fans_role)
                 print(f"🌟 Added '{FANS_ROLE_NAME}' to {member.display_name}")
+
+@bot.event
+async def on_member_update(before, after):
+    before_roles = [role.name for role in before.roles]
+    after_roles = [role.name for role in after.roles]
+
+    guild = after.guild
+    verified_role = discord.utils.get(guild.roles, name=VERIFIED_ROLE_NAME)
+    unverified_role = discord.utils.get(guild.roles, name=UNVERIFIED_ROLE_NAME)
+    fans_role = discord.utils.get(guild.roles, name=FANS_ROLE_NAME)
+
+    if VERIFIED_ROLE_NAME not in before_roles and VERIFIED_ROLE_NAME in after_roles:
+        if fans_role and fans_role not in after.roles:
+            await after.add_roles(fans_role)
+            print(f"🌟 Added '{FANS_ROLE_NAME}' to {after.display_name}")
+        if unverified_role and unverified_role in after.roles:
+            await after.remove_roles(unverified_role)
+            print(f"❌ Removed '{UNVERIFIED_ROLE_NAME}' from {after.display_name}")
+
+    if VERIFIED_ROLE_NAME in before_roles and VERIFIED_ROLE_NAME not in after_roles:
+        if fans_role and fans_role in after.roles:
+            await after.remove_roles(fans_role)
+            print(f"🚫 Removed '{FANS_ROLE_NAME}' from {after.display_name}")
 
 @bot.tree.command(name="giverole", description="Give a role to a user.")
 @app_commands.describe(member="The user you want to give the role to", role_name="The name or mention of the role you want to give")
@@ -139,18 +165,12 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
 @bot.tree.command(name="ask", description="Start a chat with GalacBot.")
 async def ask(interaction: discord.Interaction):
     user_id = interaction.user.id
-    if user_id in active_conversations:
-        await interaction.response.send_message("You already have an active chat session! Just send me messages here.", ephemeral=True)
-        return
+    user_memory = get_memory(user_id)
 
-    # Get previous memory for the user, if exists
-    user_memory = memory_data.get(str(user_id), None)
-    
-    # Initialize conversation history for user
     if user_memory:
         active_conversations[user_id] = [
             {"role": "system", "content": AI_SYSTEM_PROMPT},
-            {"role": "assistant", "content": user_memory}
+            {"role": "assistant", "content": str(user_memory)}  # Ensure it's a string
         ]
         await interaction.response.send_message(f"Hi! I'm GalacBot the local server helper! I remember some things about you: {user_memory}\nHow may I assist you?", ephemeral=False)
     else:
@@ -187,7 +207,7 @@ async def on_message(message):
             conversation.append({"role": "user", "content": message.content})
 
             try:
-                # Use OpenAI API to get a response
+                # Use new OpenAI SDK syntax
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=conversation,
@@ -196,11 +216,8 @@ async def on_message(message):
                 answer = response.choices[0].message.content.strip()
                 conversation.append({"role": "assistant", "content": answer})
                 await message.channel.send(f"{answer}")  # No "GalacBot:" prefix
-                
-                # Save the conversation to the memory_data
-                memory_data[str(user_id)] = answer
-                save_memory_to_github(memory_data)
-
+                # Save the conversation memory to the database
+                save_memory(user_id, message.author.name, str(conversation))
             except Exception as e:
                 await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
         else:
