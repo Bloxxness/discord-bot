@@ -230,4 +230,18 @@ async def on_message(message):
             pass
     else:
         await bot.process_commands(message)
+
+def load_blacklist():
+    try:
+        file_content = repo.get_contents("blacklist.json")
+        data = file_content.decoded_content.decode()
+        if not data.strip():
+            return {}
+        return json.loads(data)
+    except Exception as e:
+        print(f"Error loading blacklist from GitHub: {e}")
+        return {}
+
+blacklist = load_blacklist()
+
 bot.run(token)
