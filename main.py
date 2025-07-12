@@ -230,28 +230,39 @@ async def on_message(message):
             pass
     else:
         await bot.process_commands(message)
-# Load blacklist from memory on startup
-blacklist = memory_data.get("blacklist", {})
+BLACKLIST_FILE_PATH = "blacklist.json"
 
-# Updated save_memory function (if not already in your code)
-def save_memory(memory_data):
+# Load blacklist from GitHub
+def load_blacklist():
     try:
-        file_content = json.dumps(memory_data, indent=4)
-        repo.update_file(file_path, "Update memory.json", file_content, repo.get_contents(file_path).sha)
+        file_content = repo.get_contents(BLACKLIST_FILE_PATH)
+        return json.loads(file_content.decoded_content.decode())
     except Exception as e:
-        print(f"Error saving memory to GitHub: {e}")
+        print(f"Error loading blacklist from GitHub: {e}")
+        return {}
+
+# Save blacklist to GitHub
+def save_blacklist(blacklist_data):
+    try:
+        file_content = json.dumps(blacklist_data, indent=4)
+        contents = repo.get_contents(BLACKLIST_FILE_PATH)
+        repo.update_file(BLACKLIST_FILE_PATH, "Update blacklist.json", file_content, contents.sha)
+    except Exception as e:
+        print(f"Error saving blacklist to GitHub: {e}")
+
+# Initialize blacklist from GitHub file
+blacklist = load_blacklist()
 
 # Blacklist command, only Bloxx can use
 @bot.tree.command(name="blacklist", description="Blacklist a user with a reason.")
 @app_commands.describe(user="User to blacklist", reason="Reason for blacklisting")
 async def blacklist_user(interaction: discord.Interaction, user: discord.User, reason: str):
-    if interaction.user.id != 1045850558499655770:  # Bloxx's ID
+    if interaction.user.id != 1045850558499655770:  # Bloxx's Discord ID
         await interaction.response.send_message("🚫 Only Bloxx can use this command.", ephemeral=True)
         return
 
     blacklist[str(user.id)] = reason
-    memory_data["blacklist"] = blacklist
-    save_memory(memory_data)
+    save_blacklist(blacklist)
 
     try:
         await user.send(f"You have been blacklisted from interacting with GalacBot.\nReason: {reason}")
@@ -260,7 +271,7 @@ async def blacklist_user(interaction: discord.Interaction, user: discord.User, r
 
     await interaction.response.send_message(f"✅ {user.mention} has been blacklisted.", ephemeral=True)
 
-# Prevent blacklisted users from starting /ask or /say
+# Prevent blacklisted users from starting /ask or /say commands
 @bot.tree.before_invoke
 async def check_blacklist_before_command(interaction: discord.Interaction):
     if str(interaction.user.id) in blacklist:
@@ -276,49 +287,14 @@ async def on_message(message):
         return
 
     if str(message.author.id) in blacklist:
-        # Don't start or continue AI chat for blacklisted users; no AI message output
         try:
             await message.author.send(
-                "You are blacklisted from using GalacBot. Please contact the admins if you think this is a mistake."
+                "🚫 You are blacklisted from using GalacBot. Please contact the admins if you think this is a mistake."
             )
         except Exception:
             pass
-        return  # Ignore blacklisted user's message entirely
+        return  # Ignore blacklisted user's messages
 
-    user_id = message.author.id
-
-    if user_id in active_conversations:
-        if message.content.strip():
-            conversation = active_conversations[user_id]
-            conversation.append({"role": "user", "content": message.content})
-
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=conversation,
-                    temperature=0.7
-                )
-                answer = response.choices[0].message.content.strip()
-                conversation.append({"role": "assistant", "content": answer})
-
-                user_summary = {
-                    "username": message.author.name,
-                    "summary": answer
-                }
-
-                if str(user_id) not in memory_data:
-                    memory_data[str(user_id)] = []
-
-                memory_data[str(user_id)].append(user_summary)
-                save_memory(memory_data)
-
-                await message.channel.send(answer)
-            except Exception as e:
-                await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
-        else:
-            pass
-    else:
-        await bot.process_commands(message)
-
+    await bot.process_commands(message)
 
 bot.run(token)
