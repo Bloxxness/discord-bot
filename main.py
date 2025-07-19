@@ -243,5 +243,19 @@ def load_blacklist():
         return {}
 
 blacklist = load_blacklist()
+import asyncio
+import glob
+
+async def load_command_files():
+    command_files = sorted(glob.glob('command*.py'))
+    for file_path in command_files:
+        module_name = file_path[:-3]  # remove .py extension
+        try:
+            await bot.load_extension(module_name)
+            print(f"✅ Loaded module: {module_name}")
+        except Exception as e:
+            print(f"❌ Failed to load module {module_name}: {e}")
+
+asyncio.run(load_command_files())
 
 bot.run(token)
