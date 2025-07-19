@@ -3,7 +3,6 @@ from discord import app_commands
 from discord.ext import commands
 import json
 
-# These will be injected or set after loading the cog
 repo = None
 file_path = "blacklist.json"
 blacklist = {}
@@ -31,11 +30,6 @@ class BlacklistCog(commands.Cog):
         repo = github_repo
         load_blacklist()
 
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, error):
-        if isinstance(error, commands.CheckFailure):
-            await ctx.send("🚫 You are blacklisted from interacting with GalacBot.", ephemeral=True)
-
     @app_commands.command(name="blacklist", description="Blacklist a user with a reason.")
     @app_commands.describe(user="User to blacklist", reason="Reason for blacklisting")
     async def blacklist_user(self, interaction: discord.Interaction, user: discord.User, reason: str):
@@ -53,12 +47,28 @@ class BlacklistCog(commands.Cog):
 
         await interaction.response.send_message(f"✅ {user.mention} has been blacklisted.", ephemeral=True)
 
-    async def cog_before_invoke(self, interaction: discord.Interaction):
-        if str(interaction.user.id) in blacklist:
-            await interaction.response.send_message(
-                "🚫 You are blacklisted from interacting with GalacBot.", ephemeral=True
-            )
-            raise commands.CheckFailure("User is blacklisted.")
+    @app_commands.command(name="unblacklist", description="Remove a user from the blacklist.")
+    @app_commands.describe(user="User to remove from blacklist")
+    async def unblacklist_user(self, interaction: discord.Interaction, user: discord.User):
+        if interaction.user.id != 1045850558499655770:
+            await interaction.response.send_message("🚫 Only Bloxx can use this command.", ephemeral=True)
+            return
+
+        if str(user.id) in blacklist:
+            del blacklist[str(user.id)]
+            save_blacklist()
+            await interaction.response.send_message(f"✅ {user.mention} has been removed from the blacklist.", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"⚠️ {user.mention} is not on the blacklist.", ephemeral=True)
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type == discord.InteractionType.application_command:
+            if interaction.command.name == "ask" and str(interaction.user.id) in blacklist:
+                await interaction.response.send_message(
+                    "🚫 You are blacklisted from interacting with GalacBot.", ephemeral=False
+                )
+                return
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -66,12 +76,6 @@ class BlacklistCog(commands.Cog):
             return
 
         if str(message.author.id) in blacklist:
-            try:
-                await message.author.send(
-                    "You are blacklisted from using GalacBot. Please contact the admins if you think this is a mistake."
-                )
-            except Exception:
-                pass
             return
 
 async def setup(bot, github_repo):
