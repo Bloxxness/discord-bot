@@ -18,8 +18,9 @@ def load_blacklist():
 
 def save_blacklist():
     try:
+        contents = repo.get_contents(file_path)
         content = json.dumps(blacklist, indent=4)
-        repo.update_file(file_path, "Update blacklist.json", content, repo.get_contents(file_path).sha)
+        repo.update_file(file_path, "Update blacklist.json", content, contents.sha)
     except Exception as e:
         print(f"Error saving blacklist to GitHub: {e}")
 
@@ -39,7 +40,6 @@ class BlacklistCog(commands.Cog):
 
         blacklist[str(user.id)] = reason
         save_blacklist()
-
         await interaction.response.send_message(f"✅ {user.mention} has been blacklisted.", ephemeral=False)
 
     @app_commands.command(name="unblacklist", description="Remove a user from the blacklist.")
@@ -60,18 +60,14 @@ class BlacklistCog(commands.Cog):
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type == discord.InteractionType.application_command:
             if interaction.command.name == "ask" and str(interaction.user.id) in blacklist:
-                if not interaction.response.is_done():
+                # If not already responded, respond publicly in channel
+                try:
                     await interaction.response.send_message(
                         "🚫 You are blacklisted from interacting with GalacBot.", ephemeral=False
                     )
+                except discord.errors.InteractionResponded:
+                    pass  # Already responded elsewhere
                 return
-
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if message.author.bot:
-            return
-        if str(message.author.id) in blacklist:
-            return
 
 async def setup(bot, github_repo):
     await bot.add_cog(BlacklistCog(bot, github_repo))
