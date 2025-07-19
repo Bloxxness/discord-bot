@@ -179,6 +179,14 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
         await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
 
 # Blacklist check before any command runs
+@bot.tree.check
+async def global_blacklist_check(interaction: discord.Interaction) -> bool:
+    if str(interaction.user.id) in blacklist:
+        await interaction.response.send_message(
+            "🚫 You are blacklisted from interacting with GalacBot.", ephemeral=True
+        )
+        return False
+    return True
 
 
 @bot.tree.command(name="ask", description="Start a chat with GalacBot.")
