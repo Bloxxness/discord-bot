@@ -9,9 +9,9 @@ class JoinSkit(commands.Cog):
     async def send_server_webhook(self, channel, message):
         # Find or create a webhook named "server"
         webhooks = await channel.webhooks()
-        server_webhook = discord.utils.get(webhooks, name="server")
+        server_webhook = discord.utils.get(webhooks, name="Server")
         if not server_webhook:
-            server_webhook = await channel.create_webhook(name="server")
+            server_webhook = await channel.create_webhook(name="Server")
         await server_webhook.send(message)
 
     async def perform_skit(self, guild: discord.Guild):
