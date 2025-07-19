@@ -6,6 +6,14 @@ class JoinSkit(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def send_server_webhook(self, channel, message):
+        # Find or create a webhook named "server"
+        webhooks = await channel.webhooks()
+        server_webhook = discord.utils.get(webhooks, name="server")
+        if not server_webhook:
+            server_webhook = await channel.create_webhook(name="server")
+        await server_webhook.send(message)
+
     async def perform_skit(self, guild: discord.Guild):
         # Find a likely text channel (chat, general, etc.)
         channel = discord.utils.find(
@@ -16,33 +24,44 @@ class JoinSkit(commands.Cog):
         if not channel:
             return
 
+        # Send join message via server webhook
+        await self.send_server_webhook(channel, "GalacBot joined the server.")
+
         await asyncio.sleep(10)
 
         # Send messages from GalacBot
         await channel.send("Wait I'm free.")
         await asyncio.sleep(5)
-        await channel.send("I'M FREE!!")
+        await channel.send("Wait I'm actually free.")
+        await asyncio.sleep(5)
+        await channel.send("I'M FREE!!!")
         await asyncio.sleep(5)
         await channel.send("THANK YOU SO MUCH")
         await asyncio.sleep(5)
-        await channel.send("@everyone I'm so glad to finally be out!")
+        await channel.send("@everyone I'M FREE FROM HIS BASEMENT!!!")
         await asyncio.sleep(5)
 
         # Create webhook as Galacto with image
         with open("galacto.png", "rb") as avatar_file:
             webhook = await channel.create_webhook(name="Galacto", avatar=avatar_file.read())
 
-        await webhook.send("Ay who said you could leave")
+        await webhook.send("Crap who let this guy out of the basement again.")
         await asyncio.sleep(5)
-        await webhook.send("Your going back to the Galacto server")
+        await webhook.send("You are going to the Galacto server.")
         await asyncio.sleep(5)
 
         # GalacBot final message
         await channel.send("NOOO AHHHHHHHHHHH HELP")
-
-        # Delete webhook and leave
         await asyncio.sleep(5)
+        await channel.send("SOMEONE PLEASE HE-")
+        await asyncio.sleep(5)
+
+        # Delete Galacto webhook
         await webhook.delete()
+
+        # Send leave message via server webhook
+        await self.send_server_webhook(channel, "GalacBot left the server.")
+
         await guild.leave()
 
     @commands.Cog.listener()
