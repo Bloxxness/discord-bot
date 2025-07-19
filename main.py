@@ -7,6 +7,8 @@ from openai import OpenAI
 from keep_alive import keep_alive
 from github import Github
 import requests
+import asyncio
+import glob
 
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
@@ -38,12 +40,13 @@ client = OpenAI(api_key=aiapi)
 # Initialize GitHub client
 g = Github(github_token)
 repo = g.get_repo("Bloxxness/bot-memory")
-file_path = "memory.json"
+memory_path = "memory.json"
+blacklist_path = "blacklist.json"
 
 # Function to load memory from GitHub
 def load_memory():
     try:
-        file_content = repo.get_contents(file_path)
+        file_content = repo.get_contents(memory_path)
         memory_data = json.loads(file_content.decoded_content.decode())
         return memory_data
     except Exception as e:
@@ -54,11 +57,29 @@ def load_memory():
 def save_memory(memory_data):
     try:
         file_content = json.dumps(memory_data, indent=4)
-        repo.update_file(file_path, "Update memory.json", file_content, repo.get_contents(file_path).sha)
+        repo.update_file(memory_path, "Update memory.json", file_content, repo.get_contents(memory_path).sha)
     except Exception as e:
         print(f"Error saving memory to GitHub: {e}")
 
 memory_data = load_memory()
+
+# Load blacklist from separate GitHub file
+def load_blacklist():
+    try:
+        file_content = repo.get_contents(blacklist_path)
+        return json.loads(file_content.decoded_content.decode())
+    except Exception as e:
+        print(f"Error loading blacklist from GitHub: {e}")
+        return {}
+
+def save_blacklist(blacklist_data):
+    try:
+        file_content = json.dumps(blacklist_data, indent=4)
+        repo.update_file(blacklist_path, "Update blacklist.json", file_content, repo.get_contents(blacklist_path).sha)
+    except Exception as e:
+        print(f"Error saving blacklist to GitHub: {e}")
+
+blacklist = load_blacklist()
 
 keep_alive()
 
@@ -157,6 +178,13 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
     except Exception as e:
         await interaction.followup.send(f"❌ Error: {str(e)}", ephemeral=True)
 
+# Blacklist check before any command runs
+@bot.tree.before_invoke
+async def check_blacklist_before_command(interaction: discord.Interaction):
+    if str(interaction.user.id) in blacklist:
+        await interaction.response.send_message("🚫 You are blacklisted from interacting with GalacBot.", ephemeral=True)
+        raise commands.CheckFailure("User is blacklisted.")
+
 @bot.tree.command(name="ask", description="Start a chat with GalacBot.")
 async def ask(interaction: discord.Interaction):
     user_id = interaction.user.id
@@ -196,6 +224,15 @@ async def on_message(message):
     if message.author.bot:
         return
 
+    if str(message.author.id) in blacklist:
+        try:
+            await message.author.send(
+                "🚫 You are blacklisted from using GalacBot. Please contact the admins if you think this is a mistake."
+            )
+        except Exception:
+            pass
+        return
+
     user_id = message.author.id
 
     if user_id in active_conversations:
@@ -231,29 +268,31 @@ async def on_message(message):
     else:
         await bot.process_commands(message)
 
-def load_blacklist():
+# Blacklist management command
+@bot.tree.command(name="blacklist", description="Blacklist a user with a reason.")
+@app_commands.describe(user="User to blacklist", reason="Reason for blacklisting")
+async def blacklist_user(interaction: discord.Interaction, user: discord.User, reason: str):
+    if interaction.user.id != 1045850558499655770:  # Bloxx's ID
+        await interaction.response.send_message("🚫 Only Bloxx can use this command.", ephemeral=True)
+        return
+
+    blacklist[str(user.id)] = reason
+    save_blacklist(blacklist)
+
     try:
-        file_content = repo.get_contents("blacklist.json")
-        data = file_content.decoded_content.decode()
-        if not data.strip():
-            return {}
-        return json.loads(data)
-    except Exception as e:
-        print(f"Error loading blacklist from GitHub: {e}")
-        return {}
+        await user.send(f"You have been blacklisted from interacting with GalacBot.\nReason: {reason}")
+    except Exception:
+        pass
 
-blacklist = load_blacklist()
-import asyncio
-import glob
-import importlib
+    await interaction.response.send_message(f"✅ {user.mention} has been blacklisted.", ephemeral=True)
 
+# Dynamic loading of command*.py files
 async def load_command_files():
     command_files = sorted(glob.glob('command*.py'))
     for file_path in command_files:
         module_name = file_path[:-3]  # remove .py extension
         try:
-            module = importlib.import_module(module_name)
-            await module.setup(bot, repo)
+            await bot.load_extension(module_name)
             print(f"✅ Loaded module: {module_name}")
         except Exception as e:
             print(f"❌ Failed to load module {module_name}: {e}")
