@@ -44,17 +44,17 @@ class JoinSkit(commands.Cog):
         # Create webhook as Galacto with image
         with open("galacto.png", "rb") as avatar_file:
             webhook = await channel.create_webhook(name="Galacto", avatar=avatar_file.read())
-
+        await self.send_server_webhook(channel, "Galacto joined the server.")
+        await asyncio.sleep(5)
         await webhook.send("Crap who let this guy out of the basement again.")
         await asyncio.sleep(5)
-        await webhook.send("You are going to the Galacto server.")
-        await asyncio.sleep(5)
+        await webhook.send("# You are going to the Galacto server.")
+        await asyncio.sleep(2)
 
-        # GalacBot final message
+        # GalacBot final messages
         await channel.send("NOOO AHHHHHHHHHHH HELP")
         await asyncio.sleep(5)
         await channel.send("SOMEONE PLEASE HE-")
-        await asyncio.sleep(5)
 
         # Delete Galacto webhook
         await webhook.delete()
