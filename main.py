@@ -245,13 +245,15 @@ def load_blacklist():
 blacklist = load_blacklist()
 import asyncio
 import glob
+import importlib
 
 async def load_command_files():
     command_files = sorted(glob.glob('command*.py'))
     for file_path in command_files:
         module_name = file_path[:-3]  # remove .py extension
         try:
-            await bot.load_extension(module_name)
+            module = importlib.import_module(module_name)
+            await module.setup(bot, repo)
             print(f"✅ Loaded module: {module_name}")
         except Exception as e:
             print(f"❌ Failed to load module {module_name}: {e}")
