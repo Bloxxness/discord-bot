@@ -40,12 +40,7 @@ class BlacklistCog(commands.Cog):
         blacklist[str(user.id)] = reason
         save_blacklist()
 
-        try:
-            await user.send(f"You have been blacklisted from interacting with GalacBot.\nReason: {reason}")
-        except Exception:
-            pass
-
-        await interaction.response.send_message(f"✅ {user.mention} has been blacklisted.", ephemeral=True)
+        await interaction.response.send_message(f"✅ {user.mention} has been blacklisted.", ephemeral=False)
 
     @app_commands.command(name="unblacklist", description="Remove a user from the blacklist.")
     @app_commands.describe(user="User to remove from blacklist")
@@ -57,24 +52,24 @@ class BlacklistCog(commands.Cog):
         if str(user.id) in blacklist:
             del blacklist[str(user.id)]
             save_blacklist()
-            await interaction.response.send_message(f"✅ {user.mention} has been removed from the blacklist.", ephemeral=True)
+            await interaction.response.send_message(f"✅ {user.mention} has been removed from the blacklist.", ephemeral=False)
         else:
-            await interaction.response.send_message(f"⚠️ {user.mention} is not on the blacklist.", ephemeral=True)
+            await interaction.response.send_message(f"⚠️ {user.mention} is not on the blacklist.", ephemeral=False)
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type == discord.InteractionType.application_command:
             if interaction.command.name == "ask" and str(interaction.user.id) in blacklist:
-                await interaction.response.send_message(
-                    "🚫 You are blacklisted from interacting with GalacBot.", ephemeral=False
-                )
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "🚫 You are blacklisted from interacting with GalacBot.", ephemeral=False
+                    )
                 return
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
-
         if str(message.author.id) in blacklist:
             return
 
