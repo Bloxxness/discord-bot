@@ -245,13 +245,11 @@ async def on_message(message):
             conversation.append({"role": "user", "content": message.content})
 
             try:
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=conversation,
-                    temperature=0.7
-                )
-                answer = response.choices[0].message.content.strip()
-                conversation.append({"role": "assistant", "content": answer})
+               from command3 import WebSearch  # Top of main.py
+websearch_cog = WebSearch(bot)   # Initialize the cog
+
+answer = await websearch_cog.chat_with_search(conversation, temperature=0.7)
+
 
                 user_summary = {
                     "username": message.author.name,
