@@ -246,16 +246,17 @@ async def on_message(message):
             conversation.append({"role": "user", "content": message.content})
 
             try:
-    websearch_cog = bot.get_cog("WebSearch")
-    if websearch_cog:
-        answer = await websearch_cog.chat_with_search(conversation, temperature=0.7)
-    else:
-        answer = "⚠️ WebSearch module is not available."
+                websearch_cog = bot.get_cog("WebSearch")
+                if websearch_cog:
+                    answer = await websearch_cog.chat_with_search(conversation, temperature=0.7)
+                else:
+                    answer = "⚠️ WebSearch module is not available."
 
-    user_summary = {
-        "username": message.author.name,
-        "summary": answer
-    }
+                user_summary = {
+                    "username": message.author.name,
+                    "summary": answer
+                }
+
                 if str(user_id) not in memory_data:
                     memory_data[str(user_id)] = []
 
@@ -265,10 +266,9 @@ async def on_message(message):
                 await message.channel.send(answer)
             except Exception as e:
                 await message.channel.send(f"❌ Sorry, I had trouble responding: {str(e)}")
-        else:
-            pass
     else:
         await bot.process_commands(message)
+
 
 # Blacklist management command
 @bot.tree.command(name="blacklist", description="Blacklist a user with a reason.")
