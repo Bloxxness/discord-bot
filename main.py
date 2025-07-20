@@ -252,13 +252,10 @@ async def on_message(message):
     else:
         answer = "⚠️ WebSearch module is not available."
 
-
-
-                user_summary = {
-                    "username": message.author.name,
-                    "summary": answer
-                }
-
+    user_summary = {
+        "username": message.author.name,
+        "summary": answer
+    }
                 if str(user_id) not in memory_data:
                     memory_data[str(user_id)] = []
 
