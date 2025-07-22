@@ -61,6 +61,7 @@ class JoinSkit(commands.Cog):
 
         # Send leave message via server webhook
         await self.send_server_webhook(channel, "GalacBot left the server.")
+        await self.send_server_webhook(channel, "Galacto left the server.")
 
         await guild.leave()
 
