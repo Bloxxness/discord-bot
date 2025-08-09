@@ -9,7 +9,6 @@ from github import Github
 import requests
 import asyncio
 import glob
-from command3 import WebSearch
 
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
