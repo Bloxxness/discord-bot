@@ -3,7 +3,7 @@ from discord.ext import commands
 import aiohttp
 from openai import OpenAI
 import os
-
+import asyncio
 aiapi = os.getenv("AIAPI")
 if not aiapi:
     raise RuntimeError("AIAPI environment variable not set!")
