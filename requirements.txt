@@ -3,3 +3,5 @@ flask
 openai
 PyGithub
 python-dotenv
+beautifulsoup4
+readability-lxml
