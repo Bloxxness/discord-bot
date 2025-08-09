@@ -30,7 +30,6 @@ class WebSearch(commands.Cog):
         Sends conversation to OpenAI, checks for SEARCH: triggers,
         fetches real data if needed, then re-asks AI with search results.
         """
-
         # First GPT call - run in a separate thread to avoid blocking
         response = await asyncio.to_thread(
             client.chat.completions.create,
@@ -39,11 +38,16 @@ class WebSearch(commands.Cog):
             temperature=temperature,
         )
         answer = response.choices[0].message.content.strip()
+        print(f"[DEBUG] First GPT answer: {answer}")
 
-        if "SEARCH:" in answer:
-            query = answer.split("SEARCH:", 1)[1].strip()
+        if answer.upper().startswith("SEARCH:"):
+            query = answer[len("SEARCH:"):].strip()
+            print(f"[DEBUG] Detected SEARCH query: {query}")
+
             search_result = await self.duckduckgo_search(query)
+            print(f"[DEBUG] DuckDuckGo search result: {search_result}")
 
+            # Append search results to conversation before second GPT call
             conversation.append({"role": "assistant", "content": f"Search results: {search_result}"})
 
             # Second GPT call with updated context
@@ -54,9 +58,13 @@ class WebSearch(commands.Cog):
                 temperature=temperature,
             )
             final_answer = response2.choices[0].message.content.strip()
+            print(f"[DEBUG] Final GPT answer after search: {final_answer}")
+
+            # Append final answer to conversation and return it
             conversation.append({"role": "assistant", "content": final_answer})
             return final_answer
         else:
+            # If no SEARCH trigger, just return the initial answer
             conversation.append({"role": "assistant", "content": answer})
             return answer
 
