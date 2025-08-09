@@ -187,7 +187,6 @@ async def on_interaction(interaction: discord.Interaction):
                 "🚫 You are blacklisted from interacting with GalacBot.", ephemeral=True
             )
             return
-    await bot.process_application_commands(interaction)
 
 @bot.tree.command(name="ask", description="Start a chat with GalacBot.")
 async def ask(interaction: discord.Interaction):
