@@ -9,7 +9,7 @@ from github import Github
 import requests
 import asyncio
 import glob
-
+import asyncio
 # Role names
 VERIFIED_ROLE_NAME = "[✅] Verified"
 UNVERIFIED_ROLE_NAME = "[❌] Unverified"
