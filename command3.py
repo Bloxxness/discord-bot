@@ -1,90 +1,92 @@
 import discord
 from discord.ext import commands
-import aiohttp
-import re
-import json
+import requests
 from bs4 import BeautifulSoup
-from openai import AsyncOpenAI
+import urllib.parse
 
-# Replace with your bot token in main bot script
-# This is the command file
-
-client = AsyncOpenAI(api_key="YOUR_OPENAI_API_KEY")
-
-class SearchCommand(commands.Cog):
+class Search(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def fetch_search_results(self, query):
-        """Fetch search results from DuckDuckGo."""
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.duckduckgo.com/?q={query}&format=json&no_redirect=1&no_html=1") as resp:
-                return await resp.json()
-
-    async def scrape_website(self, url):
-        """Fetch and parse website content."""
+    def duckduckgo_search(self, query):
+        """Search DuckDuckGo and return top results."""
+        url = "https://api.duckduckgo.com/"
+        params = {
+            "q": query,
+            "format": "json",
+            "no_redirect": 1,
+            "no_html": 1,
+            "skip_disambig": 1
+        }
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=10) as resp:
-                    html = await resp.text()
-            soup = BeautifulSoup(html, 'html.parser')
+            resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("AbstractText"):
+                return data["AbstractText"]
+            elif data.get("RelatedTopics"):
+                topics = [t.get("Text") for t in data["RelatedTopics"] if "Text" in t][:3]
+                return "\n".join(topics) if topics else None
+            return None
+        except Exception as e:
+            return f"Error: {e}"
 
-            # Remove scripts, styles, and other unwanted tags
-            for tag in soup(["script", "style", "noscript"]):
+    def fetch_webpage_content(self, url):
+        """Fetch and clean text content from a webpage."""
+        try:
+            headers = {"User-Agent": "Mozilla/5.0"}
+            resp = requests.get(url, headers=headers, timeout=10)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+
+            # Remove scripts, styles, navs
+            for tag in soup(["script", "style", "nav", "footer", "header"]):
                 tag.decompose()
 
             text = soup.get_text(separator="\n")
-            text = re.sub(r'\n+', '\n', text).strip()
-            return text[:4000]  # limit to avoid sending huge text to GPT
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            cleaned_text = "\n".join(lines)
+            return cleaned_text[:1500] + "..." if len(cleaned_text) > 1500 else cleaned_text
         except Exception as e:
-            return f"[Error scraping {url}: {e}]"
+            return f"Failed to fetch page: {e}"
 
-    async def query_gpt5(self, prompt):
-        """Send prompt to GPT-5."""
-        response = await client.chat.completions.create(
-            model="gpt-5",
-            messages=[
-                {"role": "system", "content": "You are a research assistant. Search the web, read websites, and give complete and accurate answers."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=800
-        )
-        return response.choices[0].message["content"]
+    def get_first_result_url(self, query):
+        """Get first URL result from DuckDuckGo HTML search."""
+        try:
+            encoded_query = urllib.parse.quote_plus(query)
+            search_url = f"https://duckduckgo.com/html/?q={encoded_query}"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            resp = requests.get(search_url, headers=headers, timeout=10)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            links = soup.select(".result__a")
+            if links:
+                return links[0].get("href")
+            return None
+        except Exception as e:
+            return None
 
-    @commands.command(name="search")
+    @commands.command(name="search", help="Search DuckDuckGo and optionally fetch the top site.")
     async def search_command(self, ctx, *, query: str):
-        """Search DuckDuckGo, scrape sites, and get GPT-5 answer."""
-        await ctx.send(f"🔍 Searching for: `{query}` ...")
+        await ctx.send(f"🔍 Searching for: **{query}**")
 
-        # Step 1: Search
-        results = await self.fetch_search_results(query)
+        # Step 1: Try DuckDuckGo Instant Answer
+        snippet = self.duckduckgo_search(query)
 
-        related_urls = []
-        if "RelatedTopics" in results:
-            for item in results["RelatedTopics"]:
-                if "FirstURL" in item:
-                    related_urls.append(item["FirstURL"])
-                if "Topics" in item:
-                    for sub in item["Topics"]:
-                        if "FirstURL" in sub:
-                            related_urls.append(sub["FirstURL"])
+        if snippet and len(snippet) > 20:
+            await ctx.send(f"**DuckDuckGo says:**\n{snippet}")
+        else:
+            await ctx.send("⚠️ No useful snippet found. Trying to fetch a top website...")
 
-        if not related_urls:
-            await ctx.send("❌ No results found.")
-            return
+            # Step 2: Get first result URL
+            first_url = self.get_first_result_url(query)
+            if not first_url:
+                await ctx.send("❌ No search results found.")
+                return
 
-        # Step 2: Scrape first few pages
-        scraped_texts = []
-        for url in related_urls[:3]:
-            content = await self.scrape_website(url)
-            scraped_texts.append(f"Source: {url}\n{content}")
-
-        combined_text = "\n\n".join(scraped_texts)
-
-        # Step 3: Ask GPT-5
-        final_answer = await self.query_gpt5(f"Search results for: {query}\n\n{combined_text}\n\nProvide a clear and detailed answer.")
-
-        await ctx.send(final_answer[:1900])  # Discord 2000 char limit
+            # Step 3: Fetch and display webpage content
+            content = self.fetch_webpage_content(first_url)
+            await ctx.send(f"**From:** {first_url}\n\n{content}")
 
 async def setup(bot):
-    await bot.add_cog(SearchCommand(bot))
+    await bot.add_cog(Search(bot))
