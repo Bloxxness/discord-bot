@@ -243,11 +243,11 @@ async def on_message(message):
             conversation.append({"role": "user", "content": message.content})
 
             try:
-                websearch_cog = bot.get_cog("WebSearch")
+                websearch_cog = bot.get_cog("Search")
                 if websearch_cog:
                     answer = await websearch_cog.chat_with_search(conversation, temperature=0.7)
                 else:
-                    answer = "⚠️ WebSearch module is not available."
+                    answer = "⚠️ Search module is not available."
 
                 user_summary = {
                     "username": message.author.name,
