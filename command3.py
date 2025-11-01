@@ -37,8 +37,6 @@ class Search(commands.Cog):
 
     async def run_gpt_with_context(self, query: str, context_snippets: list[dict]):
         """Send query + search results to GPT-5 and get a concise answer."""
-        import aiohttp
-
         url = "https://api.openai.com/v1/chat/completions"
         headers = {"Authorization": f"Bearer {AIAPI}", "Content-Type": "application/json"}
 
@@ -90,7 +88,7 @@ class Search(commands.Cog):
         answer = await self.run_gpt_with_context(query, snippets)
         await ctx.send(answer)
 
-    async def chat_with_search(self, conversation, temperature=0.7):
+    async def chat_with_search(self, conversation):
         """Check GPT output for SEARCH trigger and process it."""
         last_user_msg = None
         for m in reversed(conversation):
@@ -101,14 +99,12 @@ class Search(commands.Cog):
             return "⚠️ No user message found in conversation."
 
         # Ask GPT
-        import aiohttp
         url = "https://api.openai.com/v1/chat/completions"
         headers = {"Authorization": f"Bearer {AIAPI}", "Content-Type": "application/json"}
         payload = {
             "model": AI_MODEL,
             "messages": conversation,
             "max_completion_tokens": 300,
-            "temperature": temperature,
         }
 
         async with aiohttp.ClientSession() as session:
