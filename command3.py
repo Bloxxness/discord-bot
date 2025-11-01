@@ -6,8 +6,8 @@ import aiohttp
 import json
 
 # ====== CONFIG ======
-AIAPI = os.getenv("AIAPI")             # Your OpenAI API key
-LANGSEARCH_API_KEY = os.getenv("LANGSEARCH_API_KEY")  # Your LangSearch API key
+AIAPI = os.getenv("AIAPI")  # Your OpenAI API key
+LANGSEARCH_API_KEY = os.getenv("LANGSEARCH_API_KEY")  # LangSearch API key
 AI_MODEL = "gpt-5"
 # ====================
 
@@ -25,7 +25,7 @@ class Search(commands.Cog):
         payload = {
             "query": query,
             "count": max_results,
-            "summary": True,  # Ask LangSearch to provide summary/snippet
+            "summary": True,
         }
 
         async with aiohttp.ClientSession() as session:
@@ -82,12 +82,25 @@ class Search(commands.Cog):
         except Exception:
             return "❌ Unexpected response from API."
 
+    async def handle_search_trigger(self, text: str):
+        """
+        Detects SEARCH: <query> lines and runs LangSearch + GPT on it.
+        """
+        if not text.startswith("SEARCH:"):
+            return None
+
+        query = text[len("SEARCH:"):].strip()
+        snippets = await self.perform_langsearch(query)
+        if not snippets:
+            return "⚠️ Could not fetch web results."
+        return await self.run_gpt_with_context(query, snippets)
+
     @commands.command(name="search", help="Search the web using LangSearch and summarize results.")
     async def search_command(self, ctx, *, query: str):
         await ctx.send(f"🔍 Searching the web for: **{query}**")
         snippets = await self.perform_langsearch(query)
         if not snippets:
-            await ctx.send("⚠️ Could not fetch web results. Please try again later.")
+            await ctx.send("⚠️ Could not fetch web results.")
             return
         answer = await self.run_gpt_with_context(query, snippets)
         await ctx.send(answer)
@@ -95,8 +108,8 @@ class Search(commands.Cog):
     async def chat_with_search(self, conversation, temperature=0.7):
         """
         For main.py to call when in active conversation mode.
+        Checks if GPT output contains a SEARCH trigger and processes it.
         """
-        # find last user message
         last_user_msg = None
         for m in reversed(conversation):
             if m.get("role") == "user":
@@ -105,11 +118,33 @@ class Search(commands.Cog):
         if not last_user_msg:
             return "⚠️ No user message found in conversation."
 
-        snippets = await self.perform_langsearch(last_user_msg)
-        if not snippets:
-            return "⚠️ Could not fetch web results."
+        # First, let GPT generate the answer / detect search trigger
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {AIAPI}", "Content-Type": "application/json"}
+        payload = {
+            "model": AI_MODEL,
+            "messages": conversation,
+            "max_tokens": 300,
+            "temperature": temperature,
+        }
 
-        return await self.run_gpt_with_context(last_user_msg, snippets)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status != 200:
+                    return f"❌ API request failed: {resp.status} - {await resp.text()}"
+                data = await resp.json()
+
+        try:
+            gpt_output = data["choices"][0]["message"]["content"]
+        except Exception:
+            return "❌ Unexpected response from API."
+
+        # Check for SEARCH trigger
+        if gpt_output.startswith("SEARCH:"):
+            return await self.handle_search_trigger(gpt_output)
+
+        return gpt_output
 
 async def setup(bot):
     await bot.add_cog(Search(bot))
+
