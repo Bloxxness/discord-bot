@@ -6,7 +6,7 @@ import aiohttp
 import json
 
 # ====== CONFIG ======
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Set this in your environment variables
+AIAPI = os.getenv("AIAPI")  # Set this in your environment variables
 AI_MODEL = "gpt-5"
 # ====================
 
