@@ -6,83 +6,110 @@ import aiohttp
 import json
 
 # ====== CONFIG ======
-AIAPI = os.getenv("AIAPI")  # Set this in your environment variables
+AIAPI = os.getenv("AIAPI")             # Your OpenAI API key
+LANGSEARCH_API_KEY = os.getenv("LANGSEARCH_API_KEY")  # Your LangSearch API key
 AI_MODEL = "gpt-5"
 # ====================
 
-class Search(commands.Cog):   # renamed so bot.get_cog("Search") finds this cog
+class Search(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def run_gpt_web(self, query):
+    async def perform_langsearch(self, query: str, max_results: int = 3):
         """
-        Sends the query to GPT-5 with web search enabled so it can both search and read websites.
+        Perform a web search using LangSearch API.
+        Returns a list of results with title, url, and snippet/summary.
         """
-        url = "https://api.openai.com/v1/chat/completions"
-
-        headers = {
-            "Authorization": f"Bearer {AIAPI}",
-            "Content-Type": "application/json"
-        }
-
+        url = "https://api.langsearch.com/v1/web-search"
+        headers = {"Authorization": f"Bearer {LANGSEARCH_API_KEY}"}
         payload = {
-            "model": AI_MODEL,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an AI assistant with live web search and browsing capabilities. "
-                               "If needed, you can access websites to extract accurate and detailed information."
-                },
-                {
-                    "role": "user",
-                    "content": query
-                }
-            ],
-            "tools": [
-                {"type": "web_search"},  # Let GPT search the internet
-                {"type": "web_browse"}   # Let GPT open and read sites
-            ],
-            "max_tokens": 1200
+            "query": query,
+            "count": max_results,
+            "summary": True,  # Ask LangSearch to provide summary/snippet
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload) as response:
-                if response.status != 200:
-                    return f"❌ API request failed: {response.status} - {await response.text()}"
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status != 200:
+                    return []
+                data = await resp.json()
 
-                data = await response.json()
-                # Defensive: make sure the structure exists
-                try:
-                    return data["choices"][0]["message"]["content"]
-                except Exception:
-                    return "❌ Unexpected response from API."
+        results = []
+        for item in data.get("results", []):
+            results.append({
+                "title": item.get("title"),
+                "url": item.get("url"),
+                "snippet": item.get("summary") or item.get("snippet")
+            })
+        return results
+
+    async def run_gpt_with_context(self, query: str, context_snippets: list[dict]):
+        """
+        Sends the query plus snippets to OpenAI to generate a concise answer.
+        """
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {AIAPI}",
+            "Content-Type": "application/json",
+        }
+
+        # Build context from snippets
+        snippet_text = "\n".join(
+            f"{i+1}. {s['title']} — {s['url']}\n   {s['snippet']}"
+            for i, s in enumerate(context_snippets)
+        )
+
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant that uses web search results to answer questions."},
+            {"role": "user", "content": f"Here are some relevant web search results:\n{snippet_text}\n\nQuestion: {query}"}
+        ]
+
+        payload = {
+            "model": AI_MODEL,
+            "messages": messages,
+            "max_tokens": 800,
+            "temperature": 0.7,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as resp:
+                if resp.status != 200:
+                    return f"❌ API request failed: {resp.status} - {await resp.text()}"
+                data = await resp.json()
+
+        try:
+            return data["choices"][0]["message"]["content"]
+        except Exception:
+            return "❌ Unexpected response from API."
+
+    @commands.command(name="search", help="Search the web using LangSearch and summarize results.")
+    async def search_command(self, ctx, *, query: str):
+        await ctx.send(f"🔍 Searching the web for: **{query}**")
+        snippets = await self.perform_langsearch(query)
+        if not snippets:
+            await ctx.send("⚠️ Could not fetch web results. Please try again later.")
+            return
+        answer = await self.run_gpt_with_context(query, snippets)
+        await ctx.send(answer)
 
     async def chat_with_search(self, conversation, temperature=0.7):
         """
-        Expected interface used by main.py:
-        - conversation: list of message dicts like [{"role":"system","content":...}, {"role":"user",...}, ...]
-        - temperature: float (unused here but kept for compatibility)
-        This extracts the latest user message from the conversation and performs a web-enabled GPT request.
+        For main.py to call when in active conversation mode.
         """
-        # Find the last user message in the conversation
+        # find last user message
         last_user_msg = None
-        for msg in reversed(conversation):
-            if msg.get("role") == "user":
-                last_user_msg = msg.get("content")
+        for m in reversed(conversation):
+            if m.get("role") == "user":
+                last_user_msg = m.get("content")
                 break
-
         if not last_user_msg:
             return "⚠️ No user message found in conversation."
 
-        # Optionally you can enrich the prompt; keep it simple and hand off to the web-enabled call.
-        prompt = f"Please search the web and answer this query concisely:\n\n{last_user_msg}"
-        return await self.run_gpt_web(prompt)
+        snippets = await self.perform_langsearch(last_user_msg)
+        if not snippets:
+            return "⚠️ Could not fetch web results."
 
-    @commands.command(name="search", help="Search the web and access websites for more detailed results.")
-    async def search_command(self, ctx, *, query: str):
-        await ctx.send(f"🔍 Searching and reading web sources for: **{query}**")
-        result = await self.run_gpt_web(query)
-        await ctx.send(result)
+        return await self.run_gpt_with_context(last_user_msg, snippets)
 
 async def setup(bot):
     await bot.add_cog(Search(bot))
