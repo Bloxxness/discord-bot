@@ -3,10 +3,9 @@ import discord
 from discord.ext import commands
 import os
 import aiohttp
-import json
 
 # ====== CONFIG ======
-AIAPI = os.getenv("AIAPI")  # Your OpenAI API key
+AIAPI = os.getenv("AIAPI")  # OpenAI API key
 LANGSEARCH_API_KEY = os.getenv("LANGSEARCH_API_KEY")  # LangSearch API key
 AI_MODEL = "gpt-5"
 # ====================
@@ -16,17 +15,10 @@ class Search(commands.Cog):
         self.bot = bot
 
     async def perform_langsearch(self, query: str, max_results: int = 3):
-        """
-        Perform a web search using LangSearch API.
-        Returns a list of results with title, url, and snippet/summary.
-        """
+        """Perform a web search using LangSearch API."""
         url = "https://api.langsearch.com/v1/web-search"
         headers = {"Authorization": f"Bearer {LANGSEARCH_API_KEY}"}
-        payload = {
-            "query": query,
-            "count": max_results,
-            "summary": True,
-        }
+        payload = {"query": query, "count": max_results, "summary": True}
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=payload) as resp:
@@ -44,16 +36,12 @@ class Search(commands.Cog):
         return results
 
     async def run_gpt_with_context(self, query: str, context_snippets: list[dict]):
-        """
-        Sends the query plus snippets to OpenAI to generate a concise answer.
-        """
-        url = "https://api.openai.com/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {AIAPI}",
-            "Content-Type": "application/json",
-        }
+        """Send query + search results to GPT-5 and get a concise answer."""
+        import aiohttp
 
-        # Build context from snippets
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {AIAPI}", "Content-Type": "application/json"}
+
         snippet_text = "\n".join(
             f"{i+1}. {s['title']} — {s['url']}\n   {s['snippet']}"
             for i, s in enumerate(context_snippets)
@@ -67,8 +55,8 @@ class Search(commands.Cog):
         payload = {
             "model": AI_MODEL,
             "messages": messages,
-            "max_tokens": 800,
-            "temperature": 0.7,
+            "max_completion_tokens": 800,
+            "temperature": 0.7
         }
 
         async with aiohttp.ClientSession() as session:
@@ -83,9 +71,7 @@ class Search(commands.Cog):
             return "❌ Unexpected response from API."
 
     async def handle_search_trigger(self, text: str):
-        """
-        Detects SEARCH: <query> lines and runs LangSearch + GPT on it.
-        """
+        """Process SEARCH: <query> triggers."""
         if not text.startswith("SEARCH:"):
             return None
 
@@ -106,10 +92,7 @@ class Search(commands.Cog):
         await ctx.send(answer)
 
     async def chat_with_search(self, conversation, temperature=0.7):
-        """
-        For main.py to call when in active conversation mode.
-        Checks if GPT output contains a SEARCH trigger and processes it.
-        """
+        """Check GPT output for SEARCH trigger and process it."""
         last_user_msg = None
         for m in reversed(conversation):
             if m.get("role") == "user":
@@ -118,13 +101,14 @@ class Search(commands.Cog):
         if not last_user_msg:
             return "⚠️ No user message found in conversation."
 
-        # First, let GPT generate the answer / detect search trigger
+        # Ask GPT
+        import aiohttp
         url = "https://api.openai.com/v1/chat/completions"
         headers = {"Authorization": f"Bearer {AIAPI}", "Content-Type": "application/json"}
         payload = {
             "model": AI_MODEL,
             "messages": conversation,
-            "max_completion_tokens": 300  # or 800, whatever you want,
+            "max_completion_tokens": 300,
             "temperature": temperature,
         }
 
@@ -139,7 +123,6 @@ class Search(commands.Cog):
         except Exception:
             return "❌ Unexpected response from API."
 
-        # Check for SEARCH trigger
         if gpt_output.startswith("SEARCH:"):
             return await self.handle_search_trigger(gpt_output)
 
@@ -147,4 +130,3 @@ class Search(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Search(bot))
-
