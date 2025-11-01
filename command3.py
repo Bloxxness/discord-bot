@@ -1,3 +1,4 @@
+# command3.py
 import discord
 from discord.ext import commands
 import os
@@ -9,7 +10,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Set this in your environment var
 AI_MODEL = "gpt-5"
 # ====================
 
-class Command3(commands.Cog):
+class Search(commands.Cog):   # renamed so bot.get_cog("Search") finds this cog
     def __init__(self, bot):
         self.bot = bot
 
@@ -50,7 +51,32 @@ class Command3(commands.Cog):
                     return f"❌ API request failed: {response.status} - {await response.text()}"
 
                 data = await response.json()
-                return data["choices"][0]["message"]["content"]
+                # Defensive: make sure the structure exists
+                try:
+                    return data["choices"][0]["message"]["content"]
+                except Exception:
+                    return "❌ Unexpected response from API."
+
+    async def chat_with_search(self, conversation, temperature=0.7):
+        """
+        Expected interface used by main.py:
+        - conversation: list of message dicts like [{"role":"system","content":...}, {"role":"user",...}, ...]
+        - temperature: float (unused here but kept for compatibility)
+        This extracts the latest user message from the conversation and performs a web-enabled GPT request.
+        """
+        # Find the last user message in the conversation
+        last_user_msg = None
+        for msg in reversed(conversation):
+            if msg.get("role") == "user":
+                last_user_msg = msg.get("content")
+                break
+
+        if not last_user_msg:
+            return "⚠️ No user message found in conversation."
+
+        # Optionally you can enrich the prompt; keep it simple and hand off to the web-enabled call.
+        prompt = f"Please search the web and answer this query concisely:\n\n{last_user_msg}"
+        return await self.run_gpt_web(prompt)
 
     @commands.command(name="search", help="Search the web and access websites for more detailed results.")
     async def search_command(self, ctx, *, query: str):
@@ -59,4 +85,4 @@ class Command3(commands.Cog):
         await ctx.send(result)
 
 async def setup(bot):
-    await bot.add_cog(Command3(bot))
+    await bot.add_cog(Search(bot))
