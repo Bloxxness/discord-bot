@@ -124,7 +124,7 @@ class Search(commands.Cog):
         payload = {
             "model": AI_MODEL,
             "messages": conversation,
-            "max_tokens": 300,
+            "max_completion_tokens": 300  # or 800, whatever you want,
             "temperature": temperature,
         }
 
