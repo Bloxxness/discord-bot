@@ -21,7 +21,7 @@ class Search(commands.Cog):   # renamed so bot.get_cog("Search") finds this cog
         url = "https://api.openai.com/v1/chat/completions"
 
         headers = {
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Authorization": f"Bearer {AIAPI}",
             "Content-Type": "application/json"
         }
 
