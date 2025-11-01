@@ -245,7 +245,7 @@ async def on_message(message):
             try:
                 websearch_cog = bot.get_cog("Search")
                 if websearch_cog:
-                    answer = await websearch_cog.chat_with_search(conversation, temperature=0.7)
+                    answer = await websearch_cog.chat_with_search(conversation)
                 else:
                     answer = "⚠️ Search module is not available."
 
