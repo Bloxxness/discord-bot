@@ -67,14 +67,14 @@ class JoinSkit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
-        if guild.name == "Galacto's Society":
+        if guild.id == 783403638273081354:
             return
         await self.perform_skit(guild)
 
     @commands.Cog.listener()
     async def on_ready(self):
         for guild in self.bot.guilds:
-            if guild.name != "Galacto's Society":
+            if guild.id != 783403638273081354:
                 await self.perform_skit(guild)
 
 async def setup(bot):
