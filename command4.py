@@ -31,8 +31,8 @@ class Nuke(commands.Cog):
             await asyncio.sleep(1)
 
         # Spam sequence (50 messages)
-        for _ in range(50):
-            await ctx.send("# Nuked by Bloxx!")
+        for _ in range(20):
+            await ctx.send("# NUKED BY BLOXX")
 
         # Calm down afterwards
         await ctx.send("jk lol 😭")
