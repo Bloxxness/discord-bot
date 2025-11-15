@@ -1,14 +1,13 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import os
 import aiohttp
-import json
 
-# ====== CONFIG ======
+# ===== CONFIG =====
 AIAPI = os.getenv("AIAPI")  # OpenAI API key
-AI_MODEL = "gpt-5"          # GPT-5 model
-# ====================
-
+AI_MODEL = "gpt-5"
+# ==================
 
 def safe_message(text: str) -> str:
     """Ensure Discord never gets an empty message."""
@@ -18,29 +17,30 @@ def safe_message(text: str) -> str:
 
 
 class AI(commands.Cog):
-    """Discord cog for GPT-5 AI commands."""
+    """Cog for GPT-5 AI commands using slash commands."""
 
     def __init__(self, bot):
         self.bot = bot
 
-    # =============================
-    # GPT-5 COMPLETION CALL
-    # =============================
-    async def run_gpt(self, conversation: list[dict], max_tokens: int = 300) -> str:
-        """Send conversation to GPT-5 and return AI response."""
+    # -------------------------
+    # GPT CALL
+    # -------------------------
+    async def run_gpt(self, prompt: str, max_tokens: int = 300) -> str:
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {AIAPI}",
             "Content-Type": "application/json"
         }
 
-        # Prevent GPT from hallucinating SEARCH triggers
         system_message = {
             "role": "system",
             "content": "You are a helpful assistant. NEVER output 'SEARCH:' unless the user explicitly asks."
         }
 
-        messages = [system_message] + conversation
+        messages = [
+            system_message,
+            {"role": "user", "content": prompt}
+        ]
 
         payload = {
             "model": AI_MODEL,
@@ -62,28 +62,23 @@ class AI(commands.Cog):
         except Exception as e:
             return f"❌ Unexpected response from API: {e}"
 
-    # =============================
-    # DISCORD COMMAND
-    # =============================
-    @commands.command(name="ai", help="Talk to GPT-5 AI. Usage: !ai <your message>")
-    async def ai_command(self, ctx, *, prompt: str):
-        # Build conversation for GPT
-        conversation = [{"role": "user", "content": prompt}]
-        await ctx.send("🤖 Thinking...")
+    # -------------------------
+    # SLASH COMMAND
+    # -------------------------
+    @app_commands.command(name="ask", description="Ask GalacBot anything!")
+    async def ask(self, interaction: discord.Interaction, question: str):
+        # Defer interaction to allow >3s processing
+        await interaction.response.defer(thinking=True)  # Public defer
 
-        answer = await self.run_gpt(conversation)
-        await ctx.send(answer)
+        # Call GPT
+        answer = await self.run_gpt(question)
 
-    # =============================
-    # CHAT-STYLE CALL (Optional)
-    # =============================
-    async def chat_with_gpt(self, conversation: list[dict]):
-        """General GPT chat call."""
-        return await self.run_gpt(conversation)
+        # Send the public message
+        await interaction.followup.send(answer, ephemeral=False)
 
 
-# =============================
+# -------------------------
 # COG SETUP
-# =============================
-async def setup(bot):
+# -------------------------
+async def setup(bot: commands.Bot):
     await bot.add_cog(AI(bot))
