@@ -16,8 +16,8 @@ client = OpenAI(api_key=AIAPI)
 
 def _blocking_gpt_call(conversation: list) -> str:
     """
-    GPT-5 MUST use the Responses API.
-    This runs in a background thread.
+    Correct GPT-5 Responses API usage.
+    Runs in a background thread to avoid blocking Discord.
     """
 
     response = client.responses.create(
@@ -25,22 +25,27 @@ def _blocking_gpt_call(conversation: list) -> str:
         input=[
             {
                 "role": msg["role"],
-                "content": [{"type": "text", "text": msg["content"]}]
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": msg["content"]
+                    }
+                ]
             }
             for msg in conversation
         ],
         max_output_tokens=300
     )
 
-    # Extract visible text safely
-    output_text = []
+    # Extract visible text from the response
+    output_parts = []
     for item in response.output:
         if item["type"] == "message":
             for part in item["content"]:
                 if part["type"] == "output_text":
-                    output_text.append(part["text"])
+                    output_parts.append(part["text"])
 
-    return "\n".join(output_text).strip()
+    return "\n".join(output_parts).strip()
 
 
 class Search(commands.Cog):
