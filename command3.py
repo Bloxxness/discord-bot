@@ -1,84 +1,64 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 import os
-import aiohttp
 
-# ===== CONFIG =====
-AIAPI = os.getenv("AIAPI")  # OpenAI API key
+# Reuse environment + OpenAI style from main.py
+from openai import OpenAI
+
 AI_MODEL = "gpt-5"
-# ==================
+client = OpenAI(api_key=os.getenv("AIAPI"))
+
 
 def safe_message(text: str) -> str:
-    """Ensure Discord never gets an empty message."""
     if not text or not text.strip():
         return "⚠️ AI returned an empty response."
     return text
 
 
-class AI(commands.Cog):
-    """Cog for GPT-5 AI commands using slash commands."""
+class AIQuick(commands.Cog):
+    """One-off AI questions (non-conversational)."""
 
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # -------------------------
-    # GPT CALL
-    # -------------------------
     async def run_gpt(self, prompt: str, max_tokens: int = 300) -> str:
-        url = "https://api.openai.com/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {AIAPI}",
-            "Content-Type": "application/json"
-        }
-
-        system_message = {
-            "role": "system",
-            "content": "You are a helpful assistant. NEVER output 'SEARCH:' unless the user explicitly asks."
-        }
-
-        messages = [
-            system_message,
-            {"role": "user", "content": prompt}
-        ]
-
-        payload = {
-            "model": AI_MODEL,
-            "messages": messages,
-            "max_completion_tokens": max_tokens
-        }
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload) as resp:
-                if resp.status != 200:
-                    text = await resp.text()
-                    return f"❌ GPT API error {resp.status}: {text}"
-
-                data = await resp.json()
-
         try:
-            content = data["choices"][0]["message"]["content"]
-            return safe_message(content)
+            response = client.chat.completions.create(
+                model=AI_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant. NEVER output 'SEARCH:' unless explicitly asked."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_completion_tokens=max_tokens
+            )
+
+            return safe_message(response.choices[0].message.content)
+
         except Exception as e:
-            return f"❌ Unexpected response from API: {e}"
+            return f"❌ AI error: {e}"
 
-    # -------------------------
-    # SLASH COMMAND
-    # -------------------------
-    @app_commands.command(name="ask", description="Ask GalacBot anything!")
-    async def ask(self, interaction: discord.Interaction, question: str):
-        # Defer interaction to allow >3s processing
-        await interaction.response.defer(thinking=True)  # Public defer
+    @app_commands.command(
+        name="askonce",
+        description="Ask GalacBot a single question (no chat session)."
+    )
+    async def askonce(
+        self,
+        interaction: discord.Interaction,
+        question: str
+    ):
+        await interaction.response.defer(thinking=True)
 
-        # Call GPT
         answer = await self.run_gpt(question)
 
-        # Send the public message
         await interaction.followup.send(answer, ephemeral=False)
 
 
-# -------------------------
-# COG SETUP
-# -------------------------
 async def setup(bot: commands.Bot):
-    await bot.add_cog(AI(bot))
+    await bot.add_cog(AIQuick(bot))
