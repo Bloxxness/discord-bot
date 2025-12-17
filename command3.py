@@ -14,38 +14,35 @@ if not AIAPI:
 client = OpenAI(api_key=AIAPI)
 
 
+def _flatten_conversation(conversation: list) -> str:
+    """
+    Convert chat-style messages into a single text prompt.
+    GPT-5 Responses API expects raw text input.
+    """
+    lines = []
+    for msg in conversation:
+        role = msg.get("role", "user").upper()
+        content = msg.get("content", "")
+        lines.append(f"{role}: {content}")
+    return "\n".join(lines)
+
+
 def _blocking_gpt_call(conversation: list) -> str:
-    """
-    Correct GPT-5 Responses API usage.
-    Runs in a background thread to avoid blocking Discord.
-    """
+    prompt = _flatten_conversation(conversation)
 
     response = client.responses.create(
         model=AI_MODEL,
-        input=[
-            {
-                "role": msg["role"],
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": msg["content"]
-                    }
-                ]
-            }
-            for msg in conversation
-        ],
+        input=prompt,
         max_output_tokens=300
     )
 
-    # Extract visible text from the response
-    output_parts = []
+    # Extract visible text
+    output = []
     for item in response.output:
-        if item["type"] == "message":
-            for part in item["content"]:
-                if part["type"] == "output_text":
-                    output_parts.append(part["text"])
+        if item["type"] == "output_text":
+            output.append(item["text"])
 
-    return "\n".join(output_parts).strip()
+    return "\n".join(output).strip()
 
 
 class Search(commands.Cog):
