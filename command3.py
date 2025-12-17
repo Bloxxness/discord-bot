@@ -1,13 +1,16 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
 import os
-
-# Reuse environment + OpenAI style from main.py
+from discord.ext import commands
 from openai import OpenAI
 
+# ===== CONFIG =====
 AI_MODEL = "gpt-5"
-client = OpenAI(api_key=os.getenv("AIAPI"))
+AIAPI = os.getenv("AIAPI")
+# ==================
+
+if not AIAPI:
+    raise RuntimeError("AIAPI environment variable not set!")
+
+client = OpenAI(api_key=AIAPI)
 
 
 def safe_message(text: str) -> str:
@@ -16,49 +19,33 @@ def safe_message(text: str) -> str:
     return text
 
 
-class AIQuick(commands.Cog):
-    """One-off AI questions (non-conversational)."""
+class Search(commands.Cog):
+    """
+    This Cog exists because main.py explicitly looks for:
+      bot.get_cog("Search")
+    and then calls:
+      chat_with_search(conversation)
 
-    def __init__(self, bot: commands.Bot):
+    If this Cog is missing, chat WILL break.
+    """
+
+    def __init__(self, bot):
         self.bot = bot
 
-    async def run_gpt(self, prompt: str, max_tokens: int = 300) -> str:
+    async def chat_with_search(self, conversation: list) -> str:
         try:
             response = client.chat.completions.create(
                 model=AI_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant. NEVER output 'SEARCH:' unless explicitly asked."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_completion_tokens=max_tokens
+                messages=conversation,
+                max_completion_tokens=300
             )
 
-            return safe_message(response.choices[0].message.content)
+            content = response.choices[0].message.content
+            return safe_message(content)
 
         except Exception as e:
-            return f"❌ AI error: {e}"
-
-    @app_commands.command(
-        name="askonce",
-        description="Ask GalacBot a single question (no chat session)."
-    )
-    async def askonce(
-        self,
-        interaction: discord.Interaction,
-        question: str
-    ):
-        await interaction.response.defer(thinking=True)
-
-        answer = await self.run_gpt(question)
-
-        await interaction.followup.send(answer, ephemeral=False)
+            return f"❌ AI error: {str(e)}"
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(AIQuick(bot))
+    await bot.add_cog(Search(bot))
