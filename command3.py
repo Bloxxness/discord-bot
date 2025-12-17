@@ -36,13 +36,14 @@ def _blocking_gpt_call(conversation: list) -> str:
         max_output_tokens=300
     )
 
-    # Extract visible text
-    output = []
-    for item in response.output:
-        if item["type"] == "output_text":
-            output.append(item["text"])
+    # Extract visible text from SDK objects
+    output_text = []
 
-    return "\n".join(output).strip()
+    for item in response.output:
+        if hasattr(item, "type") and item.type == "output_text":
+            output_text.append(item.text)
+
+    return "\n".join(output_text).strip()
 
 
 class Search(commands.Cog):
