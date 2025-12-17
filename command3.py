@@ -1,4 +1,5 @@
 import os
+import asyncio
 from discord.ext import commands
 from openai import OpenAI
 
@@ -19,14 +20,24 @@ def safe_message(text: str) -> str:
     return text
 
 
+def _blocking_gpt_call(conversation: list) -> str:
+    """
+    Runs in a background thread.
+    MUST be synchronous.
+    """
+    response = client.chat.completions.create(
+        model=AI_MODEL,
+        messages=conversation,
+        max_completion_tokens=300
+    )
+    return response.choices[0].message.content
+
+
 class Search(commands.Cog):
     """
-    This Cog exists because main.py explicitly looks for:
+    Required by main.py:
       bot.get_cog("Search")
-    and then calls:
-      chat_with_search(conversation)
-
-    If this Cog is missing, chat WILL break.
+      await chat_with_search(conversation)
     """
 
     def __init__(self, bot):
@@ -34,13 +45,10 @@ class Search(commands.Cog):
 
     async def chat_with_search(self, conversation: list) -> str:
         try:
-            response = client.chat.completions.create(
-                model=AI_MODEL,
-                messages=conversation,
-                max_completion_tokens=300
+            content = await asyncio.to_thread(
+                _blocking_gpt_call,
+                conversation
             )
-
-            content = response.choices[0].message.content
             return safe_message(content)
 
         except Exception as e:
